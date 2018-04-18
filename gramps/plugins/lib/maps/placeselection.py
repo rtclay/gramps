@@ -43,7 +43,14 @@ _LOG = logging.getLogger("maps.placeselection")
 # GTK/Gnome modules
 #
 #-------------------------------------------------------------------------
+import gi
 from gi.repository import Gtk
+try:
+    gi.require_version('GeocodeGlib', '1.0')
+    from gi.repository import GeocodeGlib
+    GEOCODEGLIB = True
+except:
+    GEOCODEGLIB = False
 
 #-------------------------------------------------------------------------
 #
@@ -52,10 +59,12 @@ from gi.repository import Gtk
 #-------------------------------------------------------------------------
 from gramps.gen.errors import WindowActiveError
 from gramps.gui.managedwindow import ManagedWindow
+from gramps.gui.dialog import WarningDialog
 from .osmgps import OsmGps
 from gramps.gen.utils.location import get_main_location
 from gramps.gen.lib import PlaceType
 from gramps.gen.utils.place import conv_lat_lon
+from gramps.gen.display.place import displayer as _pd
 
 #-------------------------------------------------------------------------
 #
@@ -64,6 +73,8 @@ from gramps.gen.utils.place import conv_lat_lon
 #-------------------------------------------------------------------------
 PLACE_REGEXP = re.compile('<span background="green">(.*)</span>')
 PLACE_STRING = '<span background="green">%s</span>'
+GEOCODE_REGEXP = re.compile('<span background="red">(.*)</span>')
+GEOCODE_STRING = '<span background="red">%s</span>'
 
 # pylint: disable=unused-argument
 # pylint: disable=no-member
@@ -103,13 +114,19 @@ class PlaceSelection(ManagedWindow, OsmGps):
         self.function = function
         self.selection_layer = layer
         self.layer = layer
+        self.warning = False
         self.set_window(
-            Gtk.Dialog(_('Place Selection in a region'),
+            Gtk.Dialog(_('Place Selection in a region'), uistate.window,
                        buttons=(_('_Close'), Gtk.ResponseType.CLOSE)),
             None, _('Place Selection in a region'), None)
-        label = Gtk.Label(label=_('Choose the radius of the selection.\n'
-                            'On the map you should see a circle or an'
-                            ' oval depending on the latitude.'))
+        mylabel = _('Choose the radius of the selection.\n'
+                    'On the map you should see a circle or an'
+                    ' oval depending on the latitude.')
+        mylabel += _('\nIn the following table you may have :'
+                     '\n - a green row related to a selected place.')
+        if GEOCODEGLIB:
+            mylabel += _('\n - a red row related to a geocoding result.')
+        label = Gtk.Label(label=mylabel)
         label.set_valign(Gtk.Align.END)
         self.window.vbox.pack_start(label, False, True, 0)
         adj = Gtk.Adjustment(value=1.0, lower=0.1, upper=3.0,
@@ -190,6 +207,17 @@ class PlaceSelection(ManagedWindow, OsmGps):
             self.plist.append((place[0], place[1],
                                place[2], place[3], place[4]))
         # here, we could add value from geography names services ...
+        if GEOCODEGLIB:
+            loc = GeocodeGlib.Location.new(lat, lon, 0)
+            obj = GeocodeGlib.Reverse.new_for_location(loc)
+            try:
+                result = GeocodeGlib.Reverse.resolve(obj)
+                self.plist.append((GEOCODE_STRING % result.get_country(),
+                                   GEOCODE_STRING % result.get_state(),
+                                   GEOCODE_STRING % result.get_town(),
+                                   GEOCODE_STRING % result.get_name(), ''))
+            except:
+                pass
 
         # if we found no place, we must create a default place.
         self.plist.append((_("New place with empty fields"), "",
@@ -258,11 +286,31 @@ class PlaceSelection(ManagedWindow, OsmGps):
                  place, other) = self.get_location(entry[9])
                 if not [country, state, county, place, other] in self.places:
                     self.places.append([country, state, county, place, other])
+        self.warning = False
         for place in self.dbstate.db.iter_places():
             latn = place.get_latitude()
             lonn = place.get_longitude()
             if latn and lonn:
-                latn, lonn = conv_lat_lon(latn, lonn, "D.D8")
+                latn, ignore = conv_lat_lon(latn, "0", "D.D8")
+                if not latn:
+                    if not self.warning:
+                        self.close()
+                    warn1 = _("you have a wrong latitude for:")
+                    warn2 = _pd.display(self.dbstate.db, place) + "\n\n<b>"
+                    warn2 += _("Please, correct this before linking") + "</b>"
+                    WarningDialog(warn1, warn2, parent=self.uistate.window)
+                    self.warning = True
+                    continue
+                ignore, lonn = conv_lat_lon("0", lonn, "D.D8")
+                if not lonn:
+                    if not self.warning:
+                        self.close()
+                    warn1 = _("you have a wrong longitude for:") + "\n"
+                    warn2 = _pd.display(self.dbstate.db, place) + "\n\n<b>"
+                    warn2 += _("Please, correct this before linking") + "</b>"
+                    WarningDialog(warn1, warn2, parent=self.uistate.window)
+                    self.warning = True
+                    continue
                 if (math.hypot(lat-float(latn),
                                lon-float(lonn)) <= rds) == True:
                     (country, state, county,
@@ -276,4 +324,22 @@ class PlaceSelection(ManagedWindow, OsmGps):
         """
         get location values and call the real function : add_place, edit_place
         """
-        self.function(self.plist[index][3], self.lat, self.lon)
+        self.function(self.plist[index], self.lat, self.lon)
+
+    def untag_text(text, tag):
+        """
+        suppress the green or red color tag.
+        if tag = 0 : PLACE_REGEXP
+        if tag = 1 : GEOCODE_REGEXP
+        """
+
+        if tag:
+            regtag = GEOCODE_REGEXP
+        else:
+            regtag = PLACE_REGEXP
+
+        match = regtag.match(text)
+        if match:
+            without_tags = match.groups()[0]
+            return without_tags
+        return text

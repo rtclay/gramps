@@ -84,11 +84,9 @@ class EditPlace(EditPrimary):
         return Place()
 
     def _local_init(self):
-        self.width_key = 'interface.place-width'
-        self.height_key = 'interface.place-height'
-
         self.top = Glade()
         self.set_window(self.top.toplevel, None, self.get_menu_title())
+        self.setup_configs('interface.place', 650, 450)
         self.place_name_label = self.top.get_object('place_name_label')
         self.place_name_label.set_text(_('place|Name:'))
 
@@ -176,13 +174,37 @@ class EditPlace(EditPrimary):
         #force validation now with initial entry
         self.top.get_object("lat_entry").validate(force=True)
 
+        self.latlon = MonitoredEntry(
+            self.top.get_object("latlon_entry"),
+            self.set_latlongitude, self.get_latlongitude,
+            self.db.readonly)
+
+    def set_latlongitude(self, value):
+        try:
+            coma = value.index(',')
+            self.longitude.set_text(value[coma+1:])
+            self.latitude.set_text(value[:coma])
+            self.top.get_object("lat_entry").validate(force=True)
+            self.top.get_object("lon_entry").validate(force=True)
+            self.obj.set_latitude(self.latitude.get_value())
+            self.obj.set_longitude(self.longitude.get_value())
+        except:
+            pass
+
+    def get_latlongitude(self):
+        return ""
+
     def _validate_coordinate(self, widget, text, typedeg):
         if (typedeg == 'lat') and not conv_lat_lon(text, "0", "ISO-D"):
-            return ValidationError(_("Invalid latitude (syntax: 18\u00b09'") +
-                                   _('48.21"S, -18.2412 or -18:9:48.21)'))
+            return ValidationError(
+                # translators: translate the "S" too (and the "or" of course)
+                _('Invalid latitude\n(syntax: '
+                  '18\u00b09\'48.21"S, -18.2412 or -18:9:48.21)'))
         elif (typedeg == 'lon') and not conv_lat_lon("0", text, "ISO-D"):
-            return ValidationError(_("Invalid longitude (syntax: 18\u00b09'") +
-                                   _('48.21"E, -18.2412 or -18:9:48.21)'))
+            return ValidationError(
+                # translators: translate the "E" too (and the "or" of course)
+                _('Invalid longitude\n(syntax: '
+                  '18\u00b09\'48.21"E, -18.2412 or -18:9:48.21)'))
 
     def update_title(self):
         new_title = place_displayer.display(self.db, self.obj)
@@ -281,7 +303,6 @@ class EditPlace(EditPrimary):
 
     def save(self, *obj):
         self.ok_button.set_sensitive(False)
-
         if self.obj.get_name().get_value().strip() == '':
             msg1 = _("Cannot save place. Name not entered.")
             msg2 = _("You must enter a name before saving.")
@@ -303,17 +324,18 @@ class EditPlace(EditPrimary):
             self.ok_button.set_sensitive(True)
             return
 
-        with DbTxn('', self.db) as trans:
-            place_title = place_displayer.display(self.db, self.obj)
-            if not self.obj.get_handle():
+        place_title = place_displayer.display(self.db, self.obj)
+        if not self.obj.handle:
+            with DbTxn(_("Add Place (%s)") % place_title,
+                       self.db) as trans:
                 self.db.add_place(self.obj, trans)
-                msg = _("Add Place (%s)") % place_title
-            else:
-                if not self.obj.get_gramps_id():
-                    self.obj.set_gramps_id(self.db.find_next_place_gramps_id())
-                self.db.commit_place(self.obj, trans)
-                msg = _("Edit Place (%s)") % place_title
-            trans.set_description(msg)
+        else:
+            if self.data_has_changed():
+                with DbTxn(_("Edit Place (%s)") % place_title,
+                           self.db) as trans:
+                    if not self.obj.get_gramps_id():
+                        self.obj.set_gramps_id(self.db.find_next_place_gramps_id())
+                    self.db.commit_place(self.obj, trans)
 
         self._do_close()
         if self.callback:

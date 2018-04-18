@@ -11,7 +11,6 @@
   </object>
   <object class="GtkDialog" id="editcitation">
     <property name="can_focus">False</property>
-    <property name="default_width">600</property>
     <property name="type_hint">dialog</property>
     <child internal-child="vbox">
       <object class="GtkBox" id="vbox">
@@ -198,7 +197,7 @@
                 <child>
                   <object class="GtkComboBox" id="confidence">
                     <property name="visible">True</property>
-                    <property name="can_focus">True</property>
+                    <property name="can_focus">False</property>
                     <property name="tooltip_text" translatable="yes">Conveys the submitter's quantitative evaluation of the credibility of a piece of information, based upon its supporting evidence. It is not intended to eliminate the receiver's need to evaluate the evidence for themselves.
 Very Low =Unreliable evidence or estimated data
 Low =Questionable reliability of evidence (interviews, census, oral genealogies, or potential for bias for example, an autobiography)

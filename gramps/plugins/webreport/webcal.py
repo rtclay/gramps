@@ -126,8 +126,9 @@ class WebCalReport(Report):
 
         mgobn = lambda name: options.menu.get_option_by_name(name).get_value()
 
-        lang = mgobn('trans')
-        self.rlocale = self.set_locale(lang)
+        self.set_locale(options.menu.get_option_by_name('trans').get_value())
+        stdoptions.run_date_format_option(self, options.menu)
+        self.rlocale = self._locale
         self._ = self.rlocale.translation.sgettext
 
         self.html_dir = mgobn('target')
@@ -448,7 +449,7 @@ class WebCalReport(Report):
         # _CALENDARSCREEN stylesheet
         fname2 = "/".join(subdirs + ["css", _CALENDARSCREEN])
 
-        # links for GRAMPS favicon and stylesheets
+        # links for Gramps favicon and stylesheets
         links = Html("link", rel='shortcut icon',
                      href=fname1, type="image/x-icon") + (
             Html("link", href=fname2, type="text/css",
@@ -528,6 +529,7 @@ class WebCalReport(Report):
                 # each year will link to current month.
                 # this will always need an extension added
                 month = int(self.today.get_month())
+                month = month.lower()
                 full_month_name = self.rlocale.date_displayer.long_months[month]
 
                 # Note. We use '/' here because it is a URL, not a OS dependent
@@ -588,6 +590,7 @@ class WebCalReport(Report):
                     # Note. We use '/' here because it is a URL, not a OS
                     # dependent pathname need to leave home link alone,
                     # so look for it ...
+                    url_fname = url_fname.lower()
                     url = url_fname
                     add_subdirs = False
                     if not (url.startswith('http:') or url.startswith('/')):
@@ -717,20 +720,20 @@ class WebCalReport(Report):
                     self.end_year = self.start_year
                 if month > 1:
                     full_month_name = date_displayer.long_months[month-1]
-                    url = full_month_name + self.ext
+                    url = full_month_name.lower() + self.ext
                     prevm = Date(int(year), int(month-1), 0)
                     my_title = Html("a", _escape("<"), href=url,
                                     title=date_displayer.display(prevm))
                 elif self.multiyear and year > self.start_year:
                     full_month_name = date_displayer.long_months[12]
-                    url = full_month_name + self.ext
+                    url = full_month_name.lower() + self.ext
                     dest = os.path.join("../", str(year-1), url)
                     prevm = Date(int(year-1), 12, 0)
                     my_title = Html("a", _escape("<"), href=dest,
                                     title=date_displayer.display(prevm))
                 else:
                     full_month_name = date_displayer.long_months[12]
-                    url = full_month_name + self.ext
+                    url = full_month_name.lower() + self.ext
                     dest = os.path.join("../", str(self.end_year), url)
                     prevy = Date(self.end_year, 12, 0)
                     my_title = Html("a", _escape("<"), href=dest,
@@ -738,20 +741,20 @@ class WebCalReport(Report):
                 my_title += Html("</a>&nbsp;")
                 if month < 12:
                     full_month_name = date_displayer.long_months[month+1]
-                    url = full_month_name + self.ext
+                    url = full_month_name.lower() + self.ext
                     nextd = Date(int(year), int(month+1), 0)
                     my_title += Html("a", _escape(">"), href=url,
                                      title=date_displayer.display(nextd))
                 elif self.multiyear and year < self.end_year:
                     full_month_name = date_displayer.long_months[1]
-                    url = full_month_name + self.ext
+                    url = full_month_name.lower() + self.ext
                     dest = os.path.join("../", str(year+1), url)
                     nextd = Date(int(year+1), 1, 0)
                     my_title += Html("a", _escape(">"), href=dest,
                                      title=date_displayer.display(nextd))
                 else:
                     full_month_name = date_displayer.long_months[1]
-                    url = full_month_name + self.ext
+                    url = full_month_name.lower() + self.ext
                     dest = os.path.join("../", str(self.start_year), url)
                     nexty = Date(self.start_year, 1, 0)
                     my_title += Html("a", _escape(">"), href=dest,
@@ -966,6 +969,7 @@ class WebCalReport(Report):
 
             for month in range(1, 13):
                 cal_fname = self.rlocale.date_displayer.long_months[int(month)]
+                cal_fname = cal_fname.lower()
                 open_file = self.create_file(cal_fname, str(year))
 
                 # Add xml, doctype, meta and stylesheets
@@ -1265,10 +1269,7 @@ class WebCalReport(Report):
         db = self.database
 
         people = db.iter_person_handles()
-        with self._user.progress(_("Web Calendar Report"),
-                                  _('Applying Filter...'),
-                                  db.get_number_of_people()) as step:
-            people = self.filter.apply(db, people, step)
+        people = self.filter.apply(db, people, user=self._user)
 
         with self._user.progress(_("Web Calendar Report"),
                 _("Reading database..."), len(people)) as step:
@@ -1598,6 +1599,7 @@ class WebCalOptions(MenuReportOptions):
         Add options to the menu for the web calendar.
         """
         self.__add_report_options(menu)
+        self.__add_report2_options(menu)
         self.__add_content_options(menu)
         self.__add_notes_options(menu)
         self.__add_advanced_options(menu)
@@ -1634,6 +1636,33 @@ class WebCalOptions(MenuReportOptions):
 
         self.__update_filters()
 
+        ext = EnumeratedListOption(_("File extension"), ".html")
+        for etype in _WEB_EXT:
+            ext.add_item(etype, etype)
+        ext.set_help(_("The extension to be used for the web files"))
+        menu.add_option(category_name, "ext", ext)
+
+        cright = EnumeratedListOption(_('Copyright'), 0)
+        for index, copt in enumerate(_COPY_OPTIONS):
+            cright.add_item(index, copt)
+        cright.set_help(_("The copyright to be used for the web files"))
+        menu.add_option(category_name, "cright", cright)
+
+        css_list = sorted([(CSS[key]["translation"], CSS[key]["id"])
+                            for key in list(CSS.keys())
+                            if CSS[key]["user"]])
+        css = EnumeratedListOption(_('StyleSheet'), css_list[0][1])
+        for css_item in css_list:
+            css.add_item(css_item[1], css_item[0])
+        css.set_help(_('The stylesheet to be used for the web pages'))
+        menu.add_option(category_name, "css", css)
+
+    def __add_report2_options(self, menu):
+        """
+        Options on the "Report Options (2)" tab.
+        """
+        category_name = _("Report Options (2)")
+
         # We must figure out the value of the first option before we can
         # create the EnumeratedListOption
         fmt_list = _nd.get_name_format()
@@ -1656,27 +1685,8 @@ class WebCalOptions(MenuReportOptions):
         alive.set_help(_("Include only living people in the calendar"))
         menu.add_option(category_name, "alive", alive)
 
-        ext = EnumeratedListOption(_("File extension"), ".html")
-        for etype in _WEB_EXT:
-            ext.add_item(etype, etype)
-        ext.set_help(_("The extension to be used for the web files"))
-        menu.add_option(category_name, "ext", ext)
-
-        cright = EnumeratedListOption(_('Copyright'), 0)
-        for index, copt in enumerate(_COPY_OPTIONS):
-            cright.add_item(index, copt)
-        cright.set_help(_("The copyright to be used for the web files"))
-        menu.add_option(category_name, "cright", cright)
-
-        css_list = sorted([(CSS[key]["translation"], CSS[key]["id"])
-                            for key in list(CSS.keys())
-                            if CSS[key]["user"]])
-        css = EnumeratedListOption(_('StyleSheet'), css_list[0][1])
-        for css_item in css_list:
-            css.add_item(css_item[1], css_item[0])
-        css.set_help(_('The stylesheet to be used for the web pages'))
-        menu.add_option(category_name, "css", css)
-        stdoptions.add_localization_option(menu, category_name)
+        locale_opt = stdoptions.add_localization_option(menu, category_name)
+        stdoptions.add_date_format_option(menu, category_name, locale_opt)
 
     def __add_content_options(self, menu):
         """
@@ -1894,6 +1904,7 @@ def _regular_surname(sex, name):
     surname = name.get_surname()
     suffix = name.get_suffix()
     if suffix:
+        # TODO for Arabic, should the next line's comma be translated?
         surname = surname + ", " + suffix
     return surname
 
@@ -2000,8 +2011,9 @@ def get_day_list(event_date, holiday_list, bday_anniv_list, rlocale=glocale):
 
             if age_at_death is not None:
                 death_symbol = "&#10014;" # latin cross for html code
-                mess = trans_text("Died %(death_date)s.") % {
-                                  'death_date' : dead_event_date}
+                trans_date = trans_text("Died %(death_date)s.")
+                translated_date = rlocale.get_date(dead_event_date)
+                mess = trans_date % {'death_date' : translated_date}
                 age = ", <font size='+1' ><b>%s</b></font> <em>%s (%s)" % (
                                                death_symbol, mess, age_at_death)
             else:
@@ -2009,9 +2021,12 @@ def get_day_list(event_date, holiday_list, bday_anniv_list, rlocale=glocale):
                 # where "12 years" is already localized to your language
                 age = ', <em>'
                 date_y = date.get_year()
-                age += trans_text('%s old') % str(age_str) if date_y != 0 else \
-                                          trans_text("Born %(birth_date)s.") % {
-                                          'birth_date' : dead_event_date}
+                trans_date = trans_text("Born %(birth_date)s.")
+                old_date = trans_text('%s old')
+                tranlated_date = rlocale.get_date(dead_event_date)
+                age += old_date % str(age_str) if date_y != 0 else \
+                                      trans_date % {
+                                      'birth_date' : translated_date}
             txt_str = (text + age + '</em>')
 
         # an anniversary
@@ -2027,7 +2042,7 @@ def get_day_list(event_date, holiday_list, bday_anniv_list, rlocale=glocale):
                     if isinstance(dead_event_date,
                                   Date) and dead_event_date.get_year() > 0:
                         txt_str += " (" + trans_text("Until") + " "
-                        txt_str += str(dead_event_date)
+                        txt_str += rlocale.get_date(dead_event_date)
                         txt_str += ")</em>"
                     else:
                         txt_str += "</em>"

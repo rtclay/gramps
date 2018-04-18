@@ -57,22 +57,28 @@ class LogGramplet(Gramplet):
         self.append_text(_("Opened data base -----------\n"))
         # List of translated strings used here (translated in self.log ).
         _('Added'), _('Deleted'), _('Edited'), _('Selected') # Dead code for l10n
-        self.dbstate.db.connect('person-add',
-                                lambda handles: self.log('Person', 'Added', handles))
-        self.dbstate.db.connect('person-delete',
-                                lambda handles: self.log('Person', 'Deleted', handles))
-        self.dbstate.db.connect('person-update',
-                                lambda handles: self.log('Person', 'Edited', handles))
-        self.dbstate.db.connect('family-add',
-                                lambda handles: self.log('Family', 'Added', handles))
-        self.dbstate.db.connect('family-delete',
-                                lambda handles: self.log('Family', 'Deleted', handles))
-        self.dbstate.db.connect('family-update',
-                                lambda handles: self.log('Family', 'Edited', handles))
+        self.connect(self.dbstate.db, 'person-add',
+                     lambda handles: self.log('Person', 'Added', handles))
+        self.connect(self.dbstate.db, 'person-delete',
+                     lambda handles: self.log('Person', 'Deleted', handles))
+        self.connect(self.dbstate.db, 'person-update',
+                     lambda handles: self.log('Person', 'Edited', handles))
+        self.connect(self.dbstate.db, 'family-add',
+                     lambda handles: self.log('Family', 'Added', handles))
+        self.connect(self.dbstate.db, 'family-delete',
+                     lambda handles: self.log('Family', 'Deleted', handles))
+        self.connect(self.dbstate.db, 'family-update',
+                     lambda handles: self.log('Family', 'Edited', handles))
+        self.connect_signal('Person', self.active_changed)
+        self.connect_signal('Family', self.active_changed_family)
 
     def active_changed(self, handle):
         if handle:
             self.log('Person', 'Selected', [handle])
+
+    def active_changed_family(self, handle):
+        if handle:
+            self.log('Family', 'Selected', [handle])
 
     def log(self, ltype, action, handles):
         for handle in set(handles):
@@ -80,7 +86,8 @@ class LogGramplet(Gramplet):
                 continue
             self.last_log = (ltype, action, handle)
             self.timestamp()
-            self.append_text("%s: " % _(action))
+            # translators: needed for French, ignore otherwise
+            self.append_text(_("%s: ") % _(action))
             if action == 'Deleted':
                 transaction = self.dbstate.db.transaction
                 if ltype == 'Person':
@@ -89,6 +96,8 @@ class LogGramplet(Gramplet):
                         for i in transaction.get_recnos(reverse=True):
                             (obj_type, trans_type, hndl, old_data, dummy) = \
                                     transaction.get_record(i)
+                            if isinstance(hndl, bytes):
+                                hndl = str(hndl, "utf-8")
                             if (obj_type == PERSON_KEY and trans_type == TXNDEL
                                     and hndl == handle):
                                 person = Person()
@@ -101,6 +110,8 @@ class LogGramplet(Gramplet):
                         for i in transaction.get_recnos(reverse=True):
                             (obj_type, trans_type, hndl, old_data, dummy) = \
                                     transaction.get_record(i)
+                            if isinstance(hndl, bytes):
+                                hndl = str(hndl, "utf-8")
                             if (obj_type == FAMILY_KEY and trans_type == TXNDEL
                                     and hndl == handle):
                                 family = Family()

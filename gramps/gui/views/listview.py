@@ -57,7 +57,7 @@ from .navigationview import NavigationView
 from ..actiongroup import ActionGroup
 from ..columnorder import ColumnOrder
 from gramps.gen.config import config
-from gramps.gen.errors import WindowActiveError, FilterError
+from gramps.gen.errors import WindowActiveError, FilterError, HandleError
 from ..filters import SearchBar
 from ..widgets.menuitem import add_menuitem
 from gramps.gen.const import CUSTOM_FILTERS
@@ -209,7 +209,7 @@ class ListView(NavigationView):
         self.edit_action.add_actions([
                 ('Add', 'list-add', _("_Add..."), "<PRIMARY>Insert",
                     self.ADD_MSG, self.add),
-                ('Remove', 'list-remove', _("_Remove"), "<PRIMARY>Delete",
+                ('Remove', 'list-remove', _("_Delete"), "<PRIMARY>Delete",
                     self.DEL_MSG, self.remove),
                 ('Merge', 'gramps-merge', _('_Merge...'), None,
                     self.MERGE_MSG, self.merge),
@@ -278,14 +278,12 @@ class ListView(NavigationView):
     def foreground_color(self, column, renderer, model, iter_, data=None):
         '''
         Set the foreground color of the cell renderer.  We use a cell data
-        function because we don't want to set the color of untagged rows.
+        function because there is a problem returning None from a model.
         '''
         fg_color = model.get_value(iter_, model.color_column())
-        #for color errors, typically color column is badly set
-        if fg_color:
-            renderer.set_property('foreground', fg_color)
-        else:
-            LOG.debug('Bad color set: ' + str(fg_color))
+        if fg_color == '':
+            fg_color = None
+        renderer.set_property('foreground', fg_color)
 
     def set_active(self):
         """
@@ -320,9 +318,9 @@ class ListView(NavigationView):
                 if self.model:
                     self.list.set_model(None)
                     self.model.destroy()
-                self.model = self.make_model(self.dbstate.db, self.sort_col,
-                                             search=filter_info,
-                                             sort_map=self.column_order())
+                self.model = self.make_model(
+                    self.dbstate.db, self.uistate, self.sort_col,
+                    search=filter_info, sort_map=self.column_order())
             else:
                 #the entire data to show is already in memory.
                 #run only the part that determines what to show
@@ -647,10 +645,9 @@ class ListView(NavigationView):
                 self.model.reverse_order()
                 self.list.set_model(self.model)
         else:
-            self.model = self.make_model(self.dbstate.db, self.sort_col,
-                                         self.sort_order,
-                                         search=filter_info,
-                                         sort_map=self.column_order())
+            self.model = self.make_model(
+                self.dbstate.db, self.uistate, self.sort_col, self.sort_order,
+                search=filter_info, sort_map=self.column_order())
 
             self.list.set_model(self.model)
 
@@ -707,7 +704,15 @@ class ListView(NavigationView):
         """
         selected_ids = self.selected_handles()
         if len(selected_ids) > 0:
-            self.change_active(selected_ids[0])
+            # In certain cases the tree models do row updates which result in a
+            # selection changed signal to a handle in progress of being
+            # deleted.  In these cases we don't want to change the active to
+            # non-existant handles.
+            if hasattr(self.model, "dont_change_active"):
+                if not self.model.dont_change_active:
+                    self.change_active(selected_ids[0])
+            else:
+                self.change_active(selected_ids[0])
 
         if len(selected_ids) == 1:
             if self.drag_info():
@@ -801,13 +806,16 @@ class ListView(NavigationView):
             self.build_tree()
             # Reselect one, if it still exists after rebuild:
             nav_type = self.navigation_type()
-            lookup_handle = self.dbstate.db.get_table_metadata(nav_type)['handle_func']
+            lookup_handle = self.dbstate.db.method('get_%s_from_handle', nav_type)
             for handle in selected_ids:
                 # Still exist?
-                if lookup_handle(handle):
+                try:
+                    lookup_handle(handle)
                     # Select it, and stop selecting:
-                    self.change_active(handle)
-                    break
+                except HandleError:
+                    continue
+                self.change_active(handle)
+                break
 
     def _button_press(self, obj, event):
         """
@@ -895,7 +903,7 @@ class ListView(NavigationView):
             self.edit(obj)
             return True
         # Custom interactive search
-        if event.string:
+        if Gdk.keyval_to_unicode(event.keyval):
             return self.searchbox.treeview_keypress(obj, event)
         return False
 
@@ -923,7 +931,7 @@ class ListView(NavigationView):
                     else:
                         self.edit(obj)
                         return True
-        elif event.string:
+        elif Gdk.keyval_to_unicode(event.keyval):
             # Custom interactive search
             return self.searchbox.treeview_keypress(obj, event)
         return False

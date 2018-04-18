@@ -36,8 +36,14 @@ _LOG = logging.getLogger(".widgets.interactivesearch")
 # GTK modules
 #
 #-------------------------------------------------------------------------
-from gi.repository import GObject, Gtk, Gdk
+from gi.repository import Gtk, Gdk, GLib
 
+#-------------------------------------------------------------------------
+#
+# Gramps modules
+#
+#-------------------------------------------------------------------------
+from ..utils import get_primary_mask
 #-------------------------------------------------------------------------
 #
 # InteractiveSearchBox class
@@ -70,7 +76,7 @@ class InteractiveSearchBox:
         function handling keypresses from the treeview
         for the typeahead find capabilities
         """
-        if not event.string:
+        if not Gdk.keyval_to_unicode(event.keyval):
             return False
         if self._key_cancels_search(event.keyval):
             return False
@@ -100,10 +106,7 @@ class InteractiveSearchBox:
         self._search_entry.disconnect(popup_menu_id)
 
         # Intercept CTRL+F keybinding because Gtk do not allow to _replace_ it.
-        default_accel = obj.get_modifier_mask(
-            Gdk.ModifierIntent.PRIMARY_ACCELERATOR)
-        if ((event.state & (default_accel | Gdk.ModifierType.CONTROL_MASK))
-                == (default_accel | Gdk.ModifierType.CONTROL_MASK)
+        if ((event.state & get_primary_mask())
                 and event.keyval in [Gdk.KEY_f, Gdk.KEY_F]):
             self.__imcontext_changed = True
             # self.real_start_interactive_search(event.get_device(), True)
@@ -124,8 +127,8 @@ class InteractiveSearchBox:
     def _preedit_changed(self, im_context, tree_view):
         self.__imcontext_changed = 1
         if(self._entry_flush_timeout):
-            GObject.source_remove(self._entry_flush_timeout)
-            self._entry_flush_timeout = GObject.timeout_add(
+            GLib.source_remove(self._entry_flush_timeout)
+            self._entry_flush_timeout = GLib.timeout_add(
                 self._SEARCH_DIALOG_TIMEOUT, self.cb_entry_flush_timeout)
 
     def ensure_interactive_directory(self):
@@ -140,7 +143,7 @@ class InteractiveSearchBox:
             self._search_window.set_screen(screen)
             return
 
-        self._search_window = Gtk.Window(Gtk.WindowType.POPUP)
+        self._search_window = Gtk.Window(type=Gtk.WindowType.POPUP)
         self._search_window.set_screen(screen)
         if toplevel.has_group():
             toplevel.get_group().add_window(self._search_window)
@@ -222,8 +225,8 @@ class InteractiveSearchBox:
         self._renew_flush_timeout()
         # renew search timeout
         if self._entry_launchsearch_timeout:
-            GObject.source_remove(self._entry_launchsearch_timeout)
-        self._entry_launchsearch_timeout = GObject.timeout_add(
+            GLib.source_remove(self._entry_launchsearch_timeout)
+        self._entry_launchsearch_timeout = GLib.timeout_add(
             self._SEARCH_DIALOG_LAUNCH_TIMEOUT, self.search_init)
 
     def search_init(self):
@@ -239,7 +242,7 @@ class InteractiveSearchBox:
         selection = self._treeview.get_selection()
         # disable flush timeout while searching
         if self._entry_flush_timeout:
-            GObject.source_remove(self._entry_flush_timeout)
+            GLib.source_remove(self._entry_flush_timeout)
             self._entry_flush_timeout = 0
         # search
         # cursor_path = self._treeview.get_cursor()[0]
@@ -252,8 +255,8 @@ class InteractiveSearchBox:
 
     def _renew_flush_timeout(self):
         if self._entry_flush_timeout:
-            GObject.source_remove(self._entry_flush_timeout)
-        self._entry_flush_timeout = GObject.timeout_add(
+            GLib.source_remove(self._entry_flush_timeout)
+        self._entry_flush_timeout = GLib.timeout_add(
             self._SEARCH_DIALOG_TIMEOUT, self.cb_entry_flush_timeout)
 
     def _move(self, up=False):
@@ -268,7 +271,7 @@ class InteractiveSearchBox:
         selection = self._treeview.get_selection()
         # disable flush timeout while searching
         if self._entry_flush_timeout:
-            GObject.source_remove(self._entry_flush_timeout)
+            GLib.source_remove(self._entry_flush_timeout)
             self._entry_flush_timeout = 0
         # search
         start_count = self.__selected_search_result + (-1 if up else 1)
@@ -314,7 +317,7 @@ class InteractiveSearchBox:
         menu.connect("hide", self._enable_popdown)
 
     def _enable_popdown(self, obj):
-        self._timeout_enable_popdown = GObject.timeout_add(
+        self._timeout_enable_popdown = GLib.timeout_add(
             self._SEARCH_DIALOG_TIMEOUT, self._real_search_enable_popdown)
 
     def _real_search_enable_popdown(self):
@@ -351,7 +354,7 @@ class InteractiveSearchBox:
         # Launch search
         if (event.keyval in [Gdk.KEY_Return, Gdk.KEY_KP_Enter]):
             if self._entry_launchsearch_timeout:
-                GObject.source_remove(self._entry_launchsearch_timeout)
+                GLib.source_remove(self._entry_launchsearch_timeout)
                 self._entry_launchsearch_timeout = 0
             self.search_init()
             retval = True
@@ -388,10 +391,10 @@ class InteractiveSearchBox:
             self._search_entry.disconnect(self._search_entry_changed_id)
             self._search_entry_changed_id = 0
         if self._entry_flush_timeout:
-            GObject.source_remove(self._entry_flush_timeout)
+            GLib.source_remove(self._entry_flush_timeout)
             self._entry_flush_timeout = 0
         if self._entry_launchsearch_timeout:
-            GObject.source_remove(self._entry_launchsearch_timeout)
+            GLib.source_remove(self._entry_launchsearch_timeout)
             self._entry_launchsearch_timeout = 0
         if self._search_window.get_visible():
             # send focus-in event
@@ -399,7 +402,7 @@ class InteractiveSearchBox:
             self._search_window.hide()
             self._search_entry.set_text("")
             self._treeview.emit('focus-in-event', event)
-        self.__selected_search_result = None
+        self.__selected_search_result = 0
 
     def _position_func(self, userdata=None):
         tree_window = self._treeview.get_window()
@@ -440,6 +443,8 @@ class InteractiveSearchBox:
         search_column = self._treeview.get_search_column()
         is_tree = not (model.get_flags() & Gtk.TreeModelFlags.LIST_ONLY)
         while True:
+            if not cur_iter:    # can happen on empty list
+                return False
             if (self.search_equal_func(model, search_column,
                                        text, cur_iter)):
                 count += 1

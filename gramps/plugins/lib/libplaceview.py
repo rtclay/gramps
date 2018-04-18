@@ -130,6 +130,9 @@ class PlaceBaseView(ListView):
             '<PRIMARY>BackSpace' : self.key_delete,
             })
         self.maptoolbtn = None
+
+        uistate.connect('placeformat-changed', self.build_tree)
+
         self.additional_uis.append(self.additional_ui())
 
     def navigation_type(self):
@@ -415,7 +418,7 @@ class PlaceBaseView(ListView):
                          "place hierarchy.")
                 ErrorDialog(msg, msg2, parent=self.uistate.window)
             else:
-                MergePlace(self.dbstate, self.uistate, mlist[0], mlist[1],
+                MergePlace(self.dbstate, self.uistate, [], mlist[0], mlist[1],
                            self.merged)
 
     def merged(self):

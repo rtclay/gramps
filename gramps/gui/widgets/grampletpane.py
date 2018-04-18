@@ -45,11 +45,12 @@ LOG = logging.getLogger(".")
 #
 #-------------------------------------------------------------------------
 from gramps.gen.errors import WindowActiveError
-from gramps.gen.const import URL_MANUAL_PAGE, VERSION_DIR
+from gramps.gen.const import URL_MANUAL_PAGE, VERSION_DIR, COLON
 from ..editors import EditPerson, EditFamily
 from ..managedwindow import ManagedWindow
-from ..utils import is_right_click, rgb_to_hex
+from ..utils import is_right_click, get_primary_mask, get_link_color
 from .menuitem import add_menuitem
+from ..plug import make_gui_option
 from ..plug.quick import run_quick_report_by_name
 from ..display import display_help, display_url
 from ..glade import Glade
@@ -195,12 +196,7 @@ class LinkTag(Gtk.TextTag):
     lid = 0
     #obtaining the theme link color once. Restart needed on theme change!
     linkcolor = Gtk.Label(label='test') #needed to avoid label destroyed to early
-    linkcolor = linkcolor.get_style_context().lookup_color('link_color')
-    if linkcolor[0]:
-        linkcolor = rgb_to_hex((linkcolor[1].red, linkcolor[1].green,
-                                linkcolor[1].blue))
-    else:
-        linkcolor = 'blue'
+    linkcolor = get_link_color(linkcolor.get_style_context())
 
     def __init__(self, buffer):
         LinkTag.lid += 1
@@ -235,8 +231,9 @@ class GrampletWindow(ManagedWindow):
                                    Gtk.DialogFlags.DESTROY_WITH_PARENT,
                                    (_('_Close'), Gtk.ResponseType.CLOSE)),
                         None, self.title)
-        self.window.set_size_request(gramplet.detached_width,
-                                     gramplet.detached_height)
+        cfg_name = gramplet.gname.replace(' ', '').lower() + '-gramplet'
+        self.setup_configs('interface.' + cfg_name,
+                           gramplet.detached_width, gramplet.detached_height)
         self.window.add_button(_('_Help'), Gtk.ResponseType.HELP)
         # add gramplet:
         if self.gramplet.pui:
@@ -273,7 +270,7 @@ class GrampletWindow(ManagedWindow):
 
     def build_menu_names(self, obj):
         """
-        Part of the GRAMPS window interface.
+        Part of the Gramps window interface.
         """
         return (self.title, 'Gramplet')
 
@@ -345,6 +342,7 @@ class GuiGramplet:
         self.view = pane.pageview
         self.dbstate = dbstate
         self.uistate = uistate
+        self.track = []
         self.title = title
         self.detached_window = None
         self.force_update = False
@@ -402,12 +400,12 @@ class GuiGramplet:
 
         """
         if ((Gdk.keyval_name(event.keyval) == 'Z') and
-            (event.get_state() & Gdk.ModifierType.CONTROL_MASK) and
-            (event.get_state() & Gdk.ModifierType.SHIFT_MASK)):
+            (event.get_state() &
+             get_primary_mask(Gdk.ModifierType.SHIFT_MASK))):
             self.redo()
             return True
         elif ((Gdk.keyval_name(event.keyval) == 'z') and
-              (event.get_state() & Gdk.ModifierType.CONTROL_MASK)):
+              (event.get_state() & get_primary_mask())):
             self.undo()
             return True
 
@@ -549,6 +547,12 @@ class GuiGramplet:
     def get_container_widget(self):
         raise NotImplementedError
 
+    def add_gui_option(self, option):
+        """
+        Add an option to the GUI gramplet.
+        """
+        return make_gui_option(option, self.dbstate, self.uistate, self.track)
+
     def make_gui_options(self):
         if not self.pui: return
         # BEGIN WORKAROUND:
@@ -571,7 +575,7 @@ class GuiGramplet:
         hbox.pack_start(options, True, True, 0)
         topbox.pack_start(hbox, False, False, 0)
         for item in self.pui.option_order:
-            label = Gtk.Label(label=item + ":")
+            label = Gtk.Label(label=item + COLON)
             label.set_halign(Gtk.Align.END)
             labels.pack_start(label, True, True, 0)
             options.pack_start(self.pui.option_dict[item][0], True, True, 0) # widget
@@ -629,6 +633,8 @@ class GuiGramplet:
         for (tag, link_type, handle, tooltip) in self._tags:
             if iter.has_tag(tag):
                 if link_type == 'Person':
+                    if not self.dbstate.db.has_person_handle(handle):
+                        return True
                     person = self.dbstate.db.get_person_from_handle(handle)
                     if person is not None:
                         if event.button == 1: # left mouse
@@ -690,6 +696,8 @@ class GuiGramplet:
                             display_help(handle)
                     return True
                 elif link_type == 'Family':
+                    if not self.dbstate.db.has_family_handle(handle):
+                        return True
                     family = self.dbstate.db.get_family_from_handle(handle)
                     if family is not None:
                         if event.button == 1: # left mouse
@@ -1134,7 +1142,7 @@ class GrampletPane(Gtk.ScrolledWindow):
                                              gramplet.expand, True, 0)
             # set height on gramplet.scrolledwindow here:
             gramplet.scrolledwindow.set_size_request(-1, gramplet.height)
-            # Can't minimize here, because GRAMPS calls show_all later:
+            # Can't minimize here, because Gramps calls show_all later:
             #if gramplet.gstate == "minimized": # starts max, change to min it
             #    gramplet.set_state("minimized") # minimize it
             # set minimized is called in page subclass hack (above)
@@ -1575,20 +1583,6 @@ class GrampletPane(Gtk.ScrolledWindow):
                 _('Height if not maximized'),
                 2,
                 "%s.height" % gramplet.title,
-                self._config.set,
-                config=self._config)
-            # Detached height
-            configdialog.add_pos_int_entry(grid,
-                _('Detached width'),
-                3,
-                "%s.detached_width" % gramplet.title,
-                self._config.set,
-                config=self._config)
-            # Detached width
-            configdialog.add_pos_int_entry(grid,
-                _('Detached height'),
-                4,
-                "%s.detached_height" % gramplet.title,
                 self._config.set,
                 config=self._config)
             # Options:

@@ -24,6 +24,7 @@
 #
 #-------------------------------------------------------------------------
 import sys
+import html
 import logging
 _LOG = logging.getLogger(".dialog")
 
@@ -34,6 +35,7 @@ _LOG = logging.getLogger(".dialog")
 #-------------------------------------------------------------------------
 from gi.repository import GObject
 from gi.repository import Gtk
+from gi.repository import Gdk
 from gi.repository import GdkPixbuf
 
 #-------------------------------------------------------------------------
@@ -45,7 +47,9 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 _ = glocale.translation.gettext
 from gramps.gen.const import ICON, URL_BUGHOME
 from gramps.gen.config import config
-from gramps.gui.glade import Glade
+from gramps.gen.constfunc import is_quartz
+from .glade import Glade
+from .display import display_url
 
 try:
     ICON = GdkPixbuf.Pixbuf.new_from_file(ICON)
@@ -73,6 +77,9 @@ class SaveDialog:
         label2.set_use_markup(True)
         if parent:
             self.top.set_transient_for(parent)
+            parent_modal = parent.get_modal()
+            if parent_modal:
+                parent.set_modal(False)
         self.top.show()
         response = self.top.run()
         if response == Gtk.ResponseType.NO:
@@ -82,6 +89,8 @@ class SaveDialog:
 
         config.set('interface.dont-ask', self.dontask.get_active())
         self.top.destroy()
+        if parent and parent_modal:
+            parent.set_modal(True)
 
 class QuestionDialog:
     def __init__(self, msg1, msg2, label, task, parent=None):
@@ -92,7 +101,8 @@ class QuestionDialog:
         self.top.set_title("%s - Gramps" % msg1)
 
         label1 = self.xml.get_object('qd_label1')
-        label1.set_text('<span weight="bold" size="larger">%s</span>' % msg1)
+        label1.set_text('<span weight="bold" size="larger">%s</span>' %
+                         html.escape(msg1))
         label1.set_use_markup(True)
 
         label2 = self.xml.get_object('qd_label2')
@@ -103,13 +113,17 @@ class QuestionDialog:
 
         if parent:
             self.top.set_transient_for(parent)
+            parent_modal = parent.get_modal()
+            if parent_modal:
+                parent.set_modal(False)
         self.top.show()
         response = self.top.run()
         self.top.destroy()
+        if parent and parent_modal:
+            parent.set_modal(True)
         if response == Gtk.ResponseType.ACCEPT:
             task()
 
-from gramps.gui.display import display_url
 def on_activate_link(label, uri):
     # see aboutdialog.py _show_url()
     display_url(uri)
@@ -124,7 +138,8 @@ class QuestionDialog2:
         self.top.set_title("%s - Gramps" % msg1)
 
         label1 = self.xml.get_object('qd_label1')
-        label1.set_text('<span weight="bold" size="larger">%s</span>' % msg1)
+        label1.set_text('<span weight="bold" size="larger">%s</span>' %
+                        html.escape(msg1))
         label1.set_use_markup(True)
 
         label2 = self.xml.get_object('qd_label2')
@@ -138,13 +153,19 @@ class QuestionDialog2:
         self.xml.get_object('no').set_label(label_msg2)
         self.xml.get_object('no').set_use_underline(True)
 
+        self.parent = parent
         if parent:
             self.top.set_transient_for(parent)
+            self.parent_modal = parent.get_modal()
+            if self.parent_modal:
+                parent.set_modal(False)
         self.top.show()
 
     def run(self):
         response = self.top.run()
         self.top.destroy()
+        if self.parent and self.parent_modal:
+            self.parent.set_modal(True)
         return (response == Gtk.ResponseType.ACCEPT)
 
 class OptionDialog:
@@ -167,6 +188,9 @@ class OptionDialog:
         self.xml.get_object('option2').set_label(btnmsg2)
         if parent:
             self.top.set_transient_for(parent)
+            parent_modal = parent.get_modal()
+            if parent_modal:
+                parent.set_modal(False)
         self.top.show()
         self.response = self.top.run()
         if self.response == Gtk.ResponseType.NO:
@@ -176,6 +200,8 @@ class OptionDialog:
             if task2:
                 task2()
         self.top.destroy()
+        if parent and parent_modal:
+            parent.set_modal(True)
 
     def get_response(self):
         return self.response
@@ -183,17 +209,23 @@ class OptionDialog:
 class ErrorDialog(Gtk.MessageDialog):
     def __init__(self, msg1, msg2="", parent=None):
 
-        Gtk.MessageDialog.__init__(self, parent,
-                                   flags=Gtk.DialogFlags.MODAL,
-                                   type=Gtk.MessageType.ERROR,
-                                   buttons=Gtk.ButtonsType.CLOSE)
+        Gtk.MessageDialog.__init__(self, transient_for=parent,
+                                   modal=True,
+                                   message_type=Gtk.MessageType.ERROR)
+        self.add_button(_('_Close'), Gtk.ResponseType.CLOSE)
         self.set_markup('<span weight="bold" size="larger">%s</span>' % str(msg1))
         self.format_secondary_text(msg2)
         self.set_icon(ICON)
         self.set_title("%s - Gramps" % str(msg1))
+        if parent:
+            parent_modal = parent.get_modal()
+            if parent_modal:
+                parent.set_modal(False)
         self.show()
         self.run()
         self.destroy()
+        if parent and parent_modal:
+            parent.set_modal(True)
 
 class RunDatabaseRepair(ErrorDialog):
     def __init__(self, msg, parent=None):
@@ -223,10 +255,10 @@ class DBErrorDialog(ErrorDialog):
 class WarningDialog(Gtk.MessageDialog):
     def __init__(self, msg1, msg2="", parent=None):
 
-        Gtk.MessageDialog.__init__(self, parent,
-                                   flags=Gtk.DialogFlags.MODAL,
-                                   type=Gtk.MessageType.WARNING,
-                                   buttons=Gtk.ButtonsType.CLOSE)
+        Gtk.MessageDialog.__init__(self, transient_for=parent,
+                                   modal=True,
+                                   message_type=Gtk.MessageType.WARNING)
+        self.add_button(_('_Close'), Gtk.ResponseType.CLOSE)
         self.set_markup('<span weight="bold" size="larger">%s</span>' % msg1)
         self.format_secondary_markup(msg2)
         # FIXME: Hyper-links in the secondary text display as underlined text,
@@ -236,24 +268,36 @@ class WarningDialog(Gtk.MessageDialog):
         # <WarningDialog object at 0x4880300 (GtkMessageDialog at 0x5686010)>: unknown signal name: activate-link
         self.set_icon(ICON)
         self.set_title("%s - Gramps" % msg1)
+        if parent:
+            parent_modal = parent.get_modal()
+            if parent_modal:
+                parent.set_modal(False)
         self.show()
         self.run()
         self.destroy()
+        if parent and parent_modal:
+            parent.set_modal(True)
 
 class OkDialog(Gtk.MessageDialog):
     def __init__(self, msg1, msg2="", parent=None):
 
-        Gtk.MessageDialog.__init__(self, parent,
-                                   flags=Gtk.DialogFlags.MODAL,
-                                   type=Gtk.MessageType.INFO,
-                                   buttons=Gtk.ButtonsType.CLOSE)
+        Gtk.MessageDialog.__init__(self, transient_for=parent,
+                                   modal=True,
+                                   message_type=Gtk.MessageType.INFO)
+        self.add_button(_('_Close'), Gtk.ResponseType.CLOSE)
         self.set_markup('<span weight="bold" size="larger">%s</span>' % msg1)
         self.format_secondary_text(msg2)
         self.set_icon(ICON)
         self.set_title("%s - Gramps" % msg1)
+        if parent:
+            parent_modal = parent.get_modal()
+            if parent_modal:
+                parent.set_modal(False)
         self.show()
         self.run()
         self.destroy()
+        if parent and parent_modal:
+            parent.set_modal(True)
 
 class InfoDialog:
     """
@@ -312,6 +356,9 @@ class MissingMediaDialog:
 
         if parent:
             self.top.set_transient_for(parent)
+            parent_modal = parent.get_modal()
+            if parent_modal:
+                parent.set_modal(False)
         self.top.show()
         self.top.connect('delete_event', self.warn)
         response = Gtk.ResponseType.DELETE_EVENT
@@ -333,6 +380,8 @@ class MissingMediaDialog:
         else:
             self.default_action = 0
         self.top.destroy()
+        if parent and parent_modal:
+            parent.set_modal(True)
 
     def warn(self, obj, obj2):
         WarningDialog(
@@ -367,6 +416,9 @@ class MultiSelectDialog:
 
         if parent:
             self.top.set_transient_for(parent)
+            parent_modal = parent.get_modal()
+            if parent_modal:
+                parent.set_modal(False)
         self.top.connect('delete_event', self.warn)
 
         default_action = 0
@@ -406,6 +458,8 @@ class MultiSelectDialog:
                 if self.yes_func:
                     self.yes_func(item)
         self.top.destroy()
+        if parent and parent_modal:
+            parent.set_modal(True)
 
     def warn(self, obj, obj2):
         WarningDialog(
@@ -436,8 +490,13 @@ class MessageHideDialog:
         dont_show.connect('toggled', self.update_checkbox, key)
         if parent:
             self.top.set_transient_for(parent)
+            parent_modal = parent.get_modal()
+            if parent_modal:
+                parent.set_modal(False)
         self.top.run()
         self.top.destroy()
+        if parent and parent_modal:
+            parent.set_modal(True)
 
     def update_checkbox(self, obj, constant):
         config.set(constant, obj.get_active())
@@ -449,6 +508,12 @@ def main(args):
     win = Gtk.Window()
     win.set_title('Dialog test window')
     win.set_position(Gtk.WindowPosition.CENTER)
+    #Set the mnemonic modifier on Macs to alt-ctrl so that it
+    #doesn't interfere with the extended keyboard, see
+    #https://gramps-project.org/bugs/view.php?id=6943
+    if is_quartz():
+        win.set_mnemonic_modifier(
+            Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.MOD1_MASK)
     def cb(window, event):
         Gtk.main_quit()
     win.connect('delete-event', cb)

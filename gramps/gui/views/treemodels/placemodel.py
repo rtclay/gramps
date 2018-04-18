@@ -48,6 +48,7 @@ from gramps.gen.lib import Place, PlaceType
 from gramps.gen.datehandler import format_time
 from gramps.gen.utils.place import conv_lat_lon
 from gramps.gen.display.place import displayer as place_displayer
+from gramps.gen.config import config
 from .flatbasemodel import FlatBaseModel
 from .treebasemodel import TreeBaseModel
 
@@ -126,7 +127,8 @@ class PlaceBaseModel:
         return value
 
     def column_name(self, data):
-        return data[6][0]
+        # need for spacing on the french translation
+        return _(',').join([data[6][0]] + [name[0] for name in data[7]])
 
     def column_longitude(self, data):
         if not data[3]:
@@ -199,7 +201,7 @@ class PlaceBaseModel:
         tag_handle = data[0]
         cached, value = self.get_cached_value(tag_handle, "TAG_COLOR")
         if not cached:
-            tag_color = "#000000000000"
+            tag_color = ""
             tag_priority = None
             for handle in data[16]:
                 tag = self.db.get_tag_from_handle(handle)
@@ -217,7 +219,28 @@ class PlaceBaseModel:
         Return the sorted list of tags.
         """
         tag_list = list(map(self.get_tag_name, data[16]))
+        # TODO for Arabic, should the next line's comma be translated?
         return ', '.join(sorted(tag_list, key=glocale.sort_key))
+
+    def clear_cache(self, handle=None):
+        """
+        Clear the LRU cache. Always clear lru_path, because paths may have
+        changed.
+        Need special version of this because Places include Placerefs, and a
+        change in the place the Placeref points to can make the cache stale.
+        So just clearing the effected (deleted/changed) handle is not enough.
+        Note that this is only a (very) short term issue, during processing of
+        signals from a merge event.  The update of the place containing a
+        Placeref will occur.
+        See bug 10184.
+
+        Note that this method overrides the one from 'BaseModel', through
+        FlatBaseModel and TreeBaseModel.  By locating this in PlaceBaseModel,
+        the MRU rules mean this method takes precedence.
+        """
+        self.lru_data.clear()
+        # Invalidates all paths
+        self.lru_path.clear()
 
 #-------------------------------------------------------------------------
 #
@@ -228,12 +251,12 @@ class PlaceListModel(PlaceBaseModel, FlatBaseModel):
     """
     Flat place model.  (Original code in PlaceBaseModel).
     """
-    def __init__(self, db, scol=0, order=Gtk.SortType.ASCENDING, search=None,
-                 skip=set(), sort_map=None):
+    def __init__(self, db, uistate, scol=0, order=Gtk.SortType.ASCENDING,
+                 search=None, skip=set(), sort_map=None):
 
         PlaceBaseModel.__init__(self, db)
-        FlatBaseModel.__init__(self, db, scol, order, search=search, skip=skip,
-                               sort_map=sort_map)
+        FlatBaseModel.__init__(self, db, uistate, scol, order, search=search,
+                               skip=skip, sort_map=sort_map)
 
     def destroy(self):
         """
@@ -251,11 +274,11 @@ class PlaceTreeModel(PlaceBaseModel, TreeBaseModel):
     """
     Hierarchical place model.
     """
-    def __init__(self, db, scol=0, order=Gtk.SortType.ASCENDING, search=None,
-                 skip=set(), sort_map=None):
+    def __init__(self, db, uistate, scol=0, order=Gtk.SortType.ASCENDING,
+                 search=None, skip=set(), sort_map=None):
 
         PlaceBaseModel.__init__(self, db)
-        TreeBaseModel.__init__(self, db, scol=scol, order=order,
+        TreeBaseModel.__init__(self, db, uistate, scol=scol, order=order,
                                search=search, skip=skip, sort_map=sort_map,
                                nrgroups=3,
                                group_can_have_handle=True)

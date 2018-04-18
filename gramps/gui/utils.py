@@ -44,6 +44,7 @@ import gi
 gi.require_version('PangoCairo', '1.0')
 from gi.repository import PangoCairo
 from gi.repository import GLib
+from gi.repository import Gdk
 
 #-------------------------------------------------------------------------
 #
@@ -52,6 +53,7 @@ from gi.repository import GLib
 #-------------------------------------------------------------------------
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 _ = glocale.translation.gettext
+from gramps.gen.lib import EventType, EventRoleType
 from gramps.gen.lib.person import Person
 from gramps.gen.constfunc import has_display, is_quartz, mac, win
 from gramps.gen.config import config
@@ -152,6 +154,12 @@ class ProgressMeter:
         self.__dialog.vbox.set_spacing(10)
         self.__dialog.vbox.set_border_width(24)
         self.__dialog.set_size_request(400, 125)
+        if not parent:  # if we don't have an explicit parent, try to find one
+            for win in Gtk.Window.list_toplevels():
+                if win.is_active():
+                    parent = win
+                    break
+        # if we still don't have a parent, give up
         if parent:
             self.__dialog.set_transient_for(parent)
             self.__dialog.set_modal(True)
@@ -307,6 +315,7 @@ class ProgressMeter:
         """
         Close the progress meter
         """
+        del self.__cancel_callback
         self.__dialog.destroy()
 
 #-------------------------------------------------------------------------
@@ -460,18 +469,27 @@ def process_pending_events(max_count=10):
 
 def is_right_click(event):
     """
-    Returns True if the event is a button-3 or equivalent
+    Returns True if the event is to open the context menu.
     """
     from gi.repository import Gdk
+    if Gdk.Event.triggers_context_menu(event):
+        return True
 
-    if event.type == Gdk.EventType.BUTTON_PRESS:
-        if is_quartz():
-            if (event.button == 3
-                or (event.button == 1 and event.get_state() & Gdk.ModifierType.CONTROL_MASK)):
-                return True
-
-        if event.button == 3:
-            return True
+def color_graph_family(family, dbstate):
+    """
+    :return: based on the config the color for graph family node in hex
+    :rtype: tuple (hex color fill, hex color border)
+    """
+    scheme = config.get('colors.scheme')
+    for event_ref in family.get_event_ref_list():
+        event = dbstate.db.get_event_from_handle(event_ref.ref)
+        if (event.type == EventType.DIVORCE and
+                event_ref.get_role() in (EventRoleType.FAMILY,
+                                         EventRoleType.PRIMARY)):
+            return (config.get('colors.family-divorced')[scheme],
+                    config.get('colors.border-family-divorced')[scheme])
+    return (config.get('colors.family')[scheme],
+            config.get('colors.border-family')[scheme])
 
 def color_graph_box(alive=False, gender=Person.MALE):
     """
@@ -479,27 +497,28 @@ def color_graph_box(alive=False, gender=Person.MALE):
              If gender is None, an empty box is assumed
     :rtype: tuple (hex color fill, hex color border)
     """
+    scheme = config.get('colors.scheme')
     if gender == Person.MALE:
         if alive:
-            return (config.get('preferences.color-gender-male-alive'),
-                    config.get('preferences.bordercolor-gender-male-alive'))
+            return (config.get('colors.male-alive')[scheme],
+                    config.get('colors.border-male-alive')[scheme])
         else:
-            return (config.get('preferences.color-gender-male-death'),
-                    config.get('preferences.bordercolor-gender-male-death'))
+            return (config.get('colors.male-dead')[scheme],
+                    config.get('colors.border-male-dead')[scheme])
     elif gender == Person.FEMALE:
         if alive:
-            return (config.get('preferences.color-gender-female-alive'),
-                    config.get('preferences.bordercolor-gender-female-alive'))
+            return (config.get('colors.female-alive')[scheme],
+                    config.get('colors.border-female-alive')[scheme])
         else:
-            return (config.get('preferences.color-gender-female-death'),
-                    config.get('preferences.bordercolor-gender-female-death'))
+            return (config.get('colors.female-dead')[scheme],
+                    config.get('colors.border-female-dead')[scheme])
     elif gender == Person.UNKNOWN:
         if alive:
-            return (config.get('preferences.color-gender-unknown-alive'),
-                    config.get('preferences.bordercolor-gender-unknown-alive'))
+            return (config.get('colors.unknown-alive')[scheme],
+                    config.get('colors.border-unknown-alive')[scheme])
         else:
-            return (config.get('preferences.color-gender-unknown-death'),
-                    config.get('preferences.bordercolor-gender-unknown-death'))
+            return (config.get('colors.unknown-dead')[scheme],
+                    config.get('colors.border-unknown-dead')[scheme])
     #empty box, no gender
     return ('#d2d6ce', '#000000')
 ##    print 'male alive', rgb_to_hex((185/256.0, 207/256.0, 231/256.0))
@@ -542,6 +561,21 @@ def rgb_to_hex(rgb):
     else:
         rgbint = (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))
         return '#%02x%02x%02x' % rgbint
+
+def get_link_color(context):
+    """
+    Find the link color for the current theme.
+    """
+    from gi.repository import Gtk
+
+    if Gtk.get_minor_version() > 11:
+        col = context.get_color(Gtk.StateFlags.LINK)
+    else:
+        found, col = context.lookup_color('link_color')
+        if not found:
+            col.parse('blue')
+
+    return rgb_to_hex((col.red, col.green, col.blue))
 
 def edit_object(dbstate, uistate, reftype, ref):
     """
@@ -679,3 +713,12 @@ def text_to_clipboard(text):
     clipboard = Gtk.Clipboard.get_for_display(Gdk.Display.get_default(),
                                               Gdk.SELECTION_CLIPBOARD)
     clipboard.set_text(text, -1)
+
+def get_primary_mask(addl_mask=0):
+    """
+    Obtain the IntentPrimary mask for the platform bitwise-ored with a
+    passed-in additional mask.
+    """
+    keymap = Gdk.Keymap.get_default()
+    primary = keymap.get_modifier_mask(Gdk.ModifierIntent.PRIMARY_ACCELERATOR)
+    return primary | addl_mask

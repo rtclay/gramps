@@ -63,6 +63,7 @@ from gramps.gen.lib.eventroletype import EventRoleType
 from gramps.gen.config import config
 from gramps.gen.display.place import displayer as place_displayer
 from gramps.gen.utils.libformatting import ImportInfo
+from gramps.gen.errors import GrampsImportError as Error
 
 #-------------------------------------------------------------------------
 #
@@ -919,6 +920,9 @@ class CSVParser:
 
     def get_or_create_place(self, place_name):
         "Return the requested place object tuple-packed with a new indicator."
+        if place_name.startswith("[") and place_name.endswith("]"):
+            place = self.lookup("place", place_name)
+            return (0, place)
         LOG.debug("get_or_create_place: looking for: %s", place_name)
         for place_handle in self.db.iter_place_handles():
             place = self.db.get_place_from_handle(place_handle)

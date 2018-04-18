@@ -47,7 +47,7 @@ class IsDescendantOf(Rule):
     category    = _('Descendant filters')
     description = _('Matches all descendants for the specified person')
 
-    def prepare(self, db):
+    def prepare(self, db, user):
         self.db = db
         self.map = set()
         try:
@@ -67,7 +67,8 @@ class IsDescendantOf(Rule):
         return person.handle in self.map
 
     def init_list(self, person, first):
-        if not person:
+        if not person or person.handle in self.map:
+            # if we have been here before, skip
             return
         if not first:
             self.map.add(person.handle)

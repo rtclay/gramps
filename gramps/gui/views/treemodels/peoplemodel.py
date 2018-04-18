@@ -22,7 +22,7 @@
 #
 
 """
-TreeModel for the GRAMPS Person tree.
+TreeModel for the Gramps Person tree.
 """
 
 #-------------------------------------------------------------------------
@@ -168,9 +168,6 @@ class PeopleBaseModel(BaseModel):
         cached, name = self.get_cached_value(handle, "SORT_NAME")
         if not cached:
             name = name_displayer.raw_sorted_name(data[COLUMN_NAME])
-            # internally we work with utf-8
-            if not isinstance(name, str):
-                name = name.decode('utf-8')
             self.set_cached_value(handle, "SORT_NAME", name)
         return name
 
@@ -179,9 +176,6 @@ class PeopleBaseModel(BaseModel):
         cached, name = self.get_cached_value(handle, "NAME")
         if not cached:
             name = name_displayer.raw_display_name(data[COLUMN_NAME])
-            # internally we work with utf-8 for python 2.7
-            if not isinstance(name, str):
-                name = name.encode('utf-8')
             self.set_cached_value(handle, "NAME", name)
         return name
 
@@ -544,7 +538,7 @@ class PeopleBaseModel(BaseModel):
         tag_handle = data[0]
         cached, value = self.get_cached_value(tag_handle, "TAG_COLOR")
         if not cached:
-            tag_color = "#000000000000"
+            tag_color = ""
             tag_priority = None
             for handle in data[COLUMN_TAGS]:
                 tag = self.db.get_tag_from_handle(handle)
@@ -565,6 +559,7 @@ class PeopleBaseModel(BaseModel):
         cached, value = self.get_cached_value(handle, "TAGS")
         if not cached:
             tag_list = list(map(self.get_tag_name, data[COLUMN_TAGS]))
+            # TODO for Arabic, should the next line's comma be translated?
             value = ', '.join(sorted(tag_list, key=glocale.sort_key))
             self.set_cached_value(handle, "TAGS", value)
         return value
@@ -573,11 +568,11 @@ class PersonListModel(PeopleBaseModel, FlatBaseModel):
     """
     Listed people model.
     """
-    def __init__(self, db, scol=0, order=Gtk.SortType.ASCENDING, search=None,
-                 skip=set(), sort_map=None):
+    def __init__(self, db, uistate, scol=0, order=Gtk.SortType.ASCENDING,
+                 search=None, skip=set(), sort_map=None):
         PeopleBaseModel.__init__(self, db)
-        FlatBaseModel.__init__(self, db, search=search, skip=skip, scol=scol,
-                               order=order, sort_map=sort_map)
+        FlatBaseModel.__init__(self, db, uistate, search=search, skip=skip,
+                               scol=scol, order=order, sort_map=sort_map)
 
     def destroy(self):
         """
@@ -590,11 +585,11 @@ class PersonTreeModel(PeopleBaseModel, TreeBaseModel):
     """
     Hierarchical people model.
     """
-    def __init__(self, db, scol=0, order=Gtk.SortType.ASCENDING, search=None,
-                 skip=set(), sort_map=None):
+    def __init__(self, db, uistate, scol=0, order=Gtk.SortType.ASCENDING,
+                 search=None, skip=set(), sort_map=None):
         PeopleBaseModel.__init__(self, db)
-        TreeBaseModel.__init__(self, db, search=search, skip=skip, scol=scol,
-                               order=order, sort_map=sort_map)
+        TreeBaseModel.__init__(self, db, uistate, search=search, skip=skip,
+                               scol=scol, order=order, sort_map=sort_map)
 
     def destroy(self):
         """
@@ -629,8 +624,6 @@ class PersonTreeModel(PeopleBaseModel, TreeBaseModel):
 
         name_data = data[COLUMN_NAME]
         group_name = ngn(self.db, name_data)
-        #if isinstance(group_name, str):
-        #    group_name = group_name.encode('utf-8')
         sort_key = self.sort_func(data)
 
         #if group_name not in self.group_list:

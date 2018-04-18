@@ -451,7 +451,7 @@ class GeoGraphyView(OsmGps, NavigationView):
         import shutil
 
         path = "%s%c%s" % (config.get('geography.path'), os.sep, the_map)
-        shutil.rmtree(path)
+        shutil.rmtree(path, ignore_errors=True)
 
     def add_specific_menu(self, menu, event, lat, lon):
         """
@@ -665,18 +665,20 @@ class GeoGraphyView(OsmGps, NavigationView):
                 lat = mark[3]
                 lon = mark[4]
                 icon = mark[7]
+                colour = mark[12]
                 differtype = False
                 count = 1
                 continue
             if last != current:
                 self.add_marker(None, None, lat, lon, icon, differtype,
-                                count, color=mark[12])
+                                count, color=colour)
                 differtype = False
                 count = 1
                 last = current
                 lat = mark[3]
                 lon = mark[4]
                 icon = mark[7]
+                colour = mark[12]
             else: # This marker already exists. add info.
                 count += 1
                 if icon != mark[7]:
@@ -1032,6 +1034,19 @@ class GeoGraphyView(OsmGps, NavigationView):
                         pass
         kml.destroy()
 
+    def place_exists(self, place_name):
+        """
+        Do we have already this place in our database ?
+        return the handle for this place.
+        """
+        found = None
+        place_name = place_name.replace('-', ' ').lower()
+        for place in self.dbstate.db.iter_places():
+            if place.name.get_value().lower() == place_name:
+                found = place.handle
+                break
+        return found
+
     def link_place(self, menu, event, lat, lon):
         """
         Link an existing place using longitude and latitude of location centered
@@ -1061,6 +1076,7 @@ class GeoGraphyView(OsmGps, NavigationView):
                     if gids == "":
                         gids = plce.gramps_id
                     else:
+                        # TODO for Arabic, should the next comma be translated?
                         gids = gids + ", " + plce.gramps_id
             if nb_places > 1:
                 from gramps.gui.dialog import WarningDialog
@@ -1105,6 +1121,24 @@ class GeoGraphyView(OsmGps, NavigationView):
                 placeref = PlaceRef()
                 placeref.ref = parent
                 new_place.add_placeref(placeref)
+            elif isinstance(parent, gi.overrides.Gtk.TreeModelRow):
+                # We are here because we selected a place from geocoding
+                # parent[0] : country
+                # parent[1] : state
+                # parent[2] : town
+                # parent[3] : name
+                value = PlaceSelection.untag_text(parent[2], 1)
+                plname = PlaceName()
+                plname.set_value(value)
+                handle = self.place_exists(value)
+                if handle:
+                    # The town already exists. We create a place with name
+                    placeref = PlaceRef()
+                    placeref.ref = handle
+                    new_place.add_placeref(placeref)
+                    value = PlaceSelection.untag_text(parent[3], 1)
+                    plname.set_value(value)
+                new_place.set_name(plname)
             else:
                 found = None
                 for place in self.dbstate.db.iter_places():

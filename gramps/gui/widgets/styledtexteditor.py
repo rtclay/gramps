@@ -60,9 +60,9 @@ from .toolcomboentry import ToolComboEntry
 from .springseparator import SpringSeparatorAction
 from ..spell import Spell
 from ..display import display_url
-from ..utils import SystemFonts, rgb_to_hex
+from ..utils import SystemFonts, get_primary_mask, get_link_color
 from gramps.gen.config import config
-from gramps.gen.constfunc import has_display
+from gramps.gen.constfunc import has_display, mac
 from ..actiongroup import ActionGroup
 
 #-------------------------------------------------------------------------
@@ -81,10 +81,10 @@ FORMAT_TOOLBAR = '''
   <toolitem action="%d"/>
   <toolitem action="%d"/>
   <toolitem action="%d"/>
+  <toolitem action="%d"/>
+  <toolitem action="%d"/>
   <toolitem action="Undo"/>
   <toolitem action="Redo"/>
-  <toolitem action="%d"/>
-  <toolitem action="%d"/>
   <toolitem action="%d"/>
   <toolitem action="%d"/>
   <toolitem action="%d"/>
@@ -105,14 +105,15 @@ FORMAT_TOOLBAR = '''
 FONT_SIZES = [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 22,
               24, 26, 28, 32, 36, 40, 48, 56, 64, 72]
 
-USERCHARS = "-A-Za-z0-9"
-PASSCHARS = "-A-Za-z0-9,?;.:/!%$^*&~\"#'"
-HOSTCHARS = "-A-Za-z0-9"
-PATHCHARS = "-A-Za-z0-9_$.+!*(),;:@&=?/~#%"
+USERCHARS = r"-\w"
+PASSCHARS = r"-\w,?;.:/!%$^*&~\"#'"
+HOSTCHARS = r"-\w"
+PATHCHARS = r"-\w$.+!*(),;:@&=?/~#%"
 #SCHEME = "(news:|telnet:|nntp:|file:/|https?:|ftps?:|webcal:)"
 SCHEME = "(file:/|https?:|ftps?:|webcal:)"
 USER = "[" + USERCHARS + "]+(:[" + PASSCHARS + "]+)?"
-URLPATH = "/[" + PATHCHARS + "]*[^]'.}>) \t\r\n,\\\"]"
+HOST = r"([-\w.]+|\[[0-9A-F:]+\])?"
+URLPATH = "(/[" + PATHCHARS + "]*)?[^]'.:}> \t\r\n,\\\"]"
 
 (GENURL, HTTP, MAIL, LINK) = list(range(4))
 
@@ -185,11 +186,7 @@ class StyledTextEditor(Gtk.TextView):
         self.set_buffer(self.textbuffer)
 
         st_cont = self.get_style_context()
-        col = st_cont.lookup_color('link_color')
-        if col[0]:
-            self.linkcolor = rgb_to_hex((col[1].red, col[1].green, col[1].blue))
-        else:
-            self.linkcolor = 'blue'
+        self.linkcolor = get_link_color(st_cont)
         self.textbuffer.linkcolor = self.linkcolor
 
         self.match = None
@@ -246,12 +243,12 @@ class StyledTextEditor(Gtk.TextView):
 
         """
         if ((Gdk.keyval_name(event.keyval) == 'Z') and
-            (event.get_state() & Gdk.ModifierType.CONTROL_MASK) and
-            (event.get_state() & Gdk.ModifierType.SHIFT_MASK)):
+            (event.get_state() &
+             get_primary_mask(Gdk.ModifierType.SHIFT_MASK))):
             self.redo()
             return True
         elif ((Gdk.keyval_name(event.keyval) == 'z') and
-              (event.get_state() & Gdk.ModifierType.CONTROL_MASK)):
+              (event.get_state() & get_primary_mask())):
             self.undo()
             return True
         else:
@@ -291,20 +288,18 @@ class StyledTextEditor(Gtk.TextView):
             iter_at_location = iter_at_location[1]
         self.match = self.textbuffer.match_check(iter_at_location.get_offset())
         tooltip = None
-        if not self.match:
-            for tag in (tag for tag in iter_at_location.get_tags()
-                        if tag.get_property('name').startswith("link")):
-                self.match = (x, y, LINK, tag.data, tag)
-                tooltip = self.make_tooltip_from_link(tag)
-                break
+        for tag in (tag for tag in iter_at_location.get_tags()
+                    if tag.get_property('name').startswith("link")):
+            self.match = (x, y, LINK, tag.data, tag)
+            tooltip = self.make_tooltip_from_link(tag)
+            break
 
         if self.match != self.last_match:
             self.emit('match-changed', self.match)
 
         self.last_match = self.match
-        self.get_root_window().get_pointer()
-        if tooltip:
-            self.set_tooltip_text(tooltip)
+        # self.get_root_window().get_pointer()  # Doesn't seem to do anythhing!
+        self.set_tooltip_text(tooltip)
         return False
 
     def make_tooltip_from_link(self, link_tag):
@@ -320,7 +315,9 @@ class StyledTextEditor(Gtk.TextView):
             if url.startswith("gramps://"):
                 obj_class, prop, value = url[9:].split("/")
                 display = simple_access.display(obj_class, prop, value) or url
-        return display
+        return display + ((_("\nCommand-Click to follow link") if mac() else
+                           _("\nCtrl-Click to follow link"))
+                          if self.get_editable() else '')
 
     def on_button_release_event(self, widget, event):
         """
@@ -344,9 +341,9 @@ class StyledTextEditor(Gtk.TextView):
         """
         self.selclick=False
         if ((event.type == Gdk.EventType.BUTTON_PRESS) and
-            (event.button == 1) and
-            (event.get_state() and Gdk.ModifierType.CONTROL_MASK) and
-            (self.url_match)):
+            (event.button == 1) and (self.url_match) and
+            ((event.get_state() & get_primary_mask()) or
+             not self.get_editable())):
 
             flavor = self.url_match[MATCH_FLAVOR]
             url = self.url_match[MATCH_STRING]
@@ -393,7 +390,7 @@ class StyledTextEditor(Gtk.TextView):
                 copy_menu = Gtk.MenuItem(label=_('Copy _Link Address'))
                 copy_menu.set_use_underline(True)
 
-            if flavor == LINK:
+            if flavor == LINK and self.get_editable():
                 edit_menu = Gtk.MenuItem(label=_('_Edit Link'))
                 edit_menu.set_use_underline(True)
                 edit_menu.connect('activate', self._edit_url_cb,
@@ -465,13 +462,14 @@ class StyledTextEditor(Gtk.TextView):
 
         # ...then the normal actions, which have a ToolButton as proxy
         format_actions = [
-            (str(StyledTextTagType.FONTCOLOR), 'gramps-font-color', None, None,
-             _('Font Color'), self._on_action_activate),
-            (str(StyledTextTagType.HIGHLIGHT), 'gramps-font-bgcolor', None,
-            None, _('Background Color'), self._on_action_activate),
-            (str(StyledTextTagType.LINK), 'go-jump', None, None,
+            (str(StyledTextTagType.FONTCOLOR), 'gramps-font-color',
+             _('Font Color'), None, _('Font Color'), self._on_action_activate),
+            (str(StyledTextTagType.HIGHLIGHT), 'gramps-font-bgcolor',
+             _('Background Color'), None, _('Background Color'),
+             self._on_action_activate),
+            (str(StyledTextTagType.LINK), 'go-jump', _('Link'), None,
              _('Link'), self._on_link_activate),
-            ('clear', 'edit-clear', None, None,
+            ('clear', 'edit-clear', _('Clear Markup'), None,
              _('Clear Markup'), self._format_clear_cb),
         ]
 
@@ -541,19 +539,22 @@ class StyledTextEditor(Gtk.TextView):
 
         return toolbar
 
+    def set_transient_parent(self, parent=None):
+        self.transient_parent = parent
+
     def _init_url_match(self):
         """Setup regexp matching for URL match."""
         self.textbuffer.create_tag('hyperlink',
                                    underline=Pango.Underline.SINGLE,
                                    foreground=self.linkcolor)
-        self.textbuffer.match_add(SCHEME + "//(" + USER + "@)?[" +
-                                  HOSTCHARS + ".]+" + "(:[0-9]+)?(" +
-                                  URLPATH + ")?/?", GENURL)
-        self.textbuffer.match_add("(www|ftp)[" + HOSTCHARS + "]*\\.[" +
-                                  HOSTCHARS + ".]+" + "(:[0-9]+)?(" +
-                                  URLPATH + ")?/?", HTTP)
-        self.textbuffer.match_add("(mailto:)?[a-z0-9][a-z0-9.-]*@[a-z0-9]"
-                                  "[a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)+", MAIL)
+        self.textbuffer.match_add(SCHEME + "//(" + USER + "@)?" +
+                                  HOST + "(:[0-9]+)?" +
+                                  URLPATH, GENURL)
+        self.textbuffer.match_add(r"(www\.|ftp\.)[" + HOSTCHARS + r"]*\.[" +
+                                  HOSTCHARS + ".]+" + "(:[0-9]+)?" +
+                                  URLPATH, HTTP)
+        self.textbuffer.match_add(r"(mailto:)?[\w][-.\w]*@[\w]"
+                                  r"[-\w]*(\.[\w][-.\w]*)+", MAIL)
 
     def _create_spell_menu(self):
         """
@@ -640,9 +641,13 @@ class StyledTextEditor(Gtk.TextView):
         current_value = self.textbuffer.get_style_at_cursor(style)
 
         if style == StyledTextTagType.FONTCOLOR:
-            color_dialog = Gtk.ColorChooserDialog(_("Select font color"))
+            color_dialog = Gtk.ColorChooserDialog(
+                title=_("Select font color"),
+                transient_for=self.transient_parent)
         elif style == StyledTextTagType.HIGHLIGHT:
-            color_dialog = Gtk.ColorChooserDialog(_("Select background color"))
+            color_dialog = Gtk.ColorChooserDialog(
+                title=_("Select background color"),
+                transient_for=self.transient_parent)
         else:
             _LOG.debug("unknown style: '%d'" % style)
             return
@@ -679,7 +684,7 @@ class StyledTextEditor(Gtk.TextView):
             self.textbuffer.apply_style(style, value)
         except ValueError:
             _LOG.debug("unable to convert '%s' to '%s'" %
-                       (text, StyledTextTagType.STYLE_TYPE[style]))
+                       (value, StyledTextTagType.STYLE_TYPE[style]))
 
     def _format_clear_cb(self, action):
         """

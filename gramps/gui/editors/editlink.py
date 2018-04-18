@@ -85,6 +85,8 @@ class EditLink(ManagedWindow):
         self.set_window(self.top.toplevel,
                         self.top.get_object("title"),
                         _('Link Editor'))
+        self.setup_configs('interface.editlink', 600, 160)
+
         self.uri_list = self.top.get_object('link_type')
         for text in [_("Internet Address"),       # 0 this order range above
                      _("Event"),      # 1
@@ -187,8 +189,9 @@ class EditLink(ManagedWindow):
                 if prop == "handle":
                     default = value
                 elif (prop == "gramps_id" and
-                      object_class in self.dbstate.db.get_table_names()):
-                    person = self.dbstate.db.get_table_metadata(object_class)["gramps_id_func"](value)
+                      object_class in OBJECT_MAP.values()):
+                    person = self.dbstate.db.method('get_%s_from_gramps_id',
+                                                    object_class)(value)
                     if person:
                         default = person.handle
         d = Select(self.dbstate, self.uistate, self.track,

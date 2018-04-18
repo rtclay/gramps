@@ -49,7 +49,7 @@ class IsLessThanNthGenerationDescendantOf(Rule):
     description = _("Matches people that are descendants of a "
                     "specified person not more than N generations away")
 
-    def prepare(self,db):
+    def prepare(self, db, user):
         self.db = db
         self.map = set()
         try:
@@ -65,7 +65,8 @@ class IsLessThanNthGenerationDescendantOf(Rule):
         return person.handle in self.map
 
     def init_list(self,person,gen):
-        if not person:
+        if not person or person.handle in self.map:
+            # if we have been here before, skip
             return
         if gen:
             self.map.add(person.handle)

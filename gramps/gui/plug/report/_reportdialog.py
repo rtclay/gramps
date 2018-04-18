@@ -55,7 +55,8 @@ from ...user import User
 from ...dialog import ErrorDialog, OptionDialog
 from gramps.gen.plug.report import (CATEGORY_TEXT, CATEGORY_DRAW, CATEGORY_BOOK,
                                     CATEGORY_CODE, CATEGORY_WEB,
-                                    CATEGORY_GRAPHVIZ, standalone_categories)
+                                    CATEGORY_GRAPHVIZ, CATEGORY_TREE,
+                                    standalone_categories)
 from gramps.gen.plug.docgen import StyleSheet, StyleSheetList
 from ...managedwindow import ManagedWindow
 from ._stylecombobox import StyleComboBox
@@ -151,7 +152,7 @@ class ReportDialog(ManagedWindow):
 
         self.style_name = self.options.handler.get_default_stylesheet_name()
 
-        window = Gtk.Dialog('Gramps')
+        window = Gtk.Dialog(title='Gramps')
         self.set_window(window, None, self.get_title())
         self.window.set_modal(True)
 
@@ -320,12 +321,12 @@ class ReportDialog(ManagedWindow):
             return
 
         # Styles Frame
-        label = Gtk.Label(label="%s:" % _("Style"))
+        label = Gtk.Label(label=_("%s:") % _("Style"))
         label.set_halign(Gtk.Align.START)
 
         self.style_menu = StyleComboBox()
         self.style_menu.set_hexpand(True)
-        self.style_button = Gtk.Button("%s..." % _("Style Editor"))
+        self.style_button = Gtk.Button(label="%s..." % _("Style Editor"))
         self.style_button.connect('clicked', self.on_style_edit_clicked)
 
         self.grid.attach(label, 1, self.row, 1, 1)
@@ -372,7 +373,8 @@ class ReportDialog(ManagedWindow):
         for (text, widget) in self.widgets:
             widget.set_hexpand(True)
             if text:
-                text_widget = Gtk.Label(label="%s:" % text)
+                # translators: needed for French, ignore otherwise
+                text_widget = Gtk.Label(label=_("%s:") % text)
                 text_widget.set_halign(Gtk.Align.START)
                 grid.attach(text_widget, 1, row, 1, 1)
                 grid.attach(widget, 2, row, 1, 1)
@@ -381,7 +383,7 @@ class ReportDialog(ManagedWindow):
             row += 1
 
     def setup_other_frames(self):
-        from gramps.gui.plug._guioptions import GuiTextOption
+        from .._guioptions import GuiTextOption
         for key in self.frame_names:
             flist = self.frames[key]
             grid = Gtk.Grid()
@@ -396,7 +398,7 @@ class ReportDialog(ManagedWindow):
             for (text, widget) in flist:
                 widget.set_hexpand(True)
                 if text:
-                    text_widget = Gtk.Label(label='%s:' % text)
+                    text_widget = Gtk.Label(label=_('%s:') % text)
                     text_widget.set_halign(Gtk.Align.START)
                     grid.attach(text_widget, 1, row, 1, 1)
                     if isinstance(widget, GuiTextOption):
@@ -467,7 +469,7 @@ class ReportDialog(ManagedWindow):
         directory should be used."""
 
         # Save Frame
-        self.doc_label = Gtk.Label(label="%s:" % _("Filename"))
+        self.doc_label = Gtk.Label(label=_("%s:") % _("Filename"))
         self.doc_label.set_halign(Gtk.Align.START)
 
         self.grid.attach(self.doc_label, 1, self.row, 1, 1)
@@ -587,8 +589,8 @@ class ReportDialog(ManagedWindow):
         style sheet editor object and let them play.  When they are
         done, the previous routine will be called to update the dialog
         menu for selecting a style."""
-        StyleListDisplay(self.style_sheet_list, self.build_style_menu,
-                         self.window)
+        StyleListDisplay(self.style_sheet_list, self.uistate, self.track,
+                         callback=self.build_style_menu)
 
     #----------------------------------------------------------------------
     #
@@ -615,7 +617,7 @@ class ReportDialog(ManagedWindow):
             widget, has_label = make_gui_option(option, self.dbstate,
                                                 self.uistate, self.track)
             if has_label:
-                widget_text = Gtk.Label('%s:' % option.get_label())
+                widget_text = Gtk.Label(label=(_('%s:') % option.get_label()))
                 widget_text.set_halign(Gtk.Align.START)
                 self.grid.attach(widget_text, 1, self.row, 1, 1)
                 self.doc_widgets.append(widget_text)
@@ -675,6 +677,9 @@ def report(dbstate, uistate, person, report_class, options_class,
     elif category == CATEGORY_GRAPHVIZ:
         from ._graphvizreportdialog import GraphvizReportDialog
         dialog_class = GraphvizReportDialog
+    elif category == CATEGORY_TREE:
+        from ._treereportdialog import TreeReportDialog
+        dialog_class = TreeReportDialog
     elif category == CATEGORY_WEB:
         from ._webreportdialog import WebReportDialog
         dialog_class = WebReportDialog

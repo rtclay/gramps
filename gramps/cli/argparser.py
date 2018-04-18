@@ -9,6 +9,7 @@
 # Copyright (C) 2008       Brian G. Matherly
 # Copyright (C) 2012       Doug Blank
 # Copyright (C) 2012-2013  Paul Franklin
+# Copyright (C) 2017       Serge Noiraud
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,6 +36,7 @@ Module responsible for handling the command line arguments for Gramps.
 #
 #-------------------------------------------------------------------------
 import sys
+import os
 import getopt
 import logging
 
@@ -60,6 +62,8 @@ Help options
 
 Application options
   -O, --open=FAMILY_TREE                 Open Family Tree
+  -U, --username=USERNAME                Database username
+  -P, --password=PASSWORD                Database password
   -C, --create=FAMILY_TREE               Create on open if new Family Tree
   -i, --import=FILENAME                  Import file
   -e, --export=FILENAME                  Export file
@@ -77,7 +81,6 @@ Application options
   -y, --yes                              Don't ask to confirm dangerous actions (non-GUI mode only)
   -q, --quiet                            Suppress progress indication output (non-GUI mode only)
   -v, --version                          Show versions
-  -b, --databases                        Show available database backends
 """)
 
 _USAGE = _("""
@@ -137,6 +140,8 @@ class ArgParser:
     The valid options are:
 
     -O, --open=FAMILY_TREE          Open Family Tree
+    -U, --username=USERNAME         Database username
+    -P, --password=PASSWORD         Database password
     -C, --create=FAMILY_TREE        Create on open if new Family Tree
     -i, --import=FILENAME           Import file
     -e, --export=FILENAME           Export file
@@ -154,7 +159,6 @@ class ArgParser:
     -y, --yes                       Don't ask to confirm dangerous actions
     -q, --quiet                     Suppress progress indication output
     -v, --version                   Show versions
-    -b, --databases                 Show available database backends
     -h, --help                      Display the help
     --usage                         Display usage information
 
@@ -196,6 +200,8 @@ class ArgParser:
 
         self.open_gui = None
         self.open = None
+        self.username = None
+        self.password = None
         self.exports = []
         self.actions = []
         self.imports = []
@@ -279,6 +285,10 @@ class ArgParser:
                 self.open = value
             elif option in ['-C', '--create']:
                 self.create = value
+            elif option in ['-U', '--username']:
+                self.username = value
+            elif option in ['-P', '--password']:
+                self.password = value
             elif option in ['-i', '--import']:
                 family_tree_format = None
                 if (opt_ix < len(options) - 1
@@ -292,6 +302,21 @@ class ArgParser:
                 if (opt_ix < len(options) - 1
                         and options[opt_ix + 1][0] in ('-f', '--format')):
                     family_tree_format = options[opt_ix + 1][1]
+                abs_name = os.path.abspath(os.path.expanduser(value))
+                if not os.path.exists(abs_name):
+                    # The file doesn't exists, try to create it.
+                    try:
+                        open(abs_name, 'w').close()
+                        os.unlink(abs_name)
+                    except OSError as e:
+                        message = _("WARNING: %(strerr)s "
+                                    "(errno=%(errno)s):\n"
+                                    "WARNING: %(name)s\n") % {
+                                      'strerr' : e.strerror,
+                                      'errno'  : e.errno,
+                                      'name'   : e.filename}
+                        print(message)
+                        sys.exit(1)
                 self.exports.append((value, family_tree_format))
             elif option in ['-a', '--action']:
                 action = value
@@ -324,23 +349,6 @@ class ArgParser:
                         print("%s.%s=%s" % (sect, setting,
                                             repr(config.data[sect][setting])))
                     print()
-                sys.exit(0)
-            elif option in ['-b', '--databases']:
-                default = config.data["database"]["backend"]
-                pmgr = BasePluginManager.get_instance()
-                pmgr.reg_plugins(PLUGINS_DIR, self, None)
-                pmgr.reg_plugins(USER_PLUGINS, self, None, load_on_reg=True)
-                for plugin in pmgr.get_reg_databases():
-                    pdata = pmgr.get_plugin(plugin.id)
-                    mod = pmgr.load_plugin(pdata)
-                    if mod:
-                        database = getattr(mod, pdata.databaseclass)
-                        summary = database.get_class_summary()
-                        print("Database backend ID:",
-                              pdata.id,
-                              "(default)" if pdata.id == default else "")
-                        for key in sorted(summary.keys()):
-                            print("   ", _("%s:") % key, summary[key])
                 sys.exit(0)
             elif option in ['-c', '--config']:
                 cfg_name = value

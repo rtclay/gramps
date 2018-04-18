@@ -676,6 +676,7 @@ class GeneWebParser:
                 except IndexError:  # not all parts are written all the time
                     pass
                 if tnth:    # Append title numer to title
+                    # TODO for Arabic, should the next comma be translated?
                     ttitle += ", " + tnth
                 title = self.create_event(
                            EventType.NOB_TITLE, ttitle, tstart, tplace)
@@ -909,7 +910,7 @@ class GeneWebParser:
                 LOG.warning(_(
                     "Invalid date {date} in {gw_snippet}, "
                     "preserving date as text."
-                    ).format(date=e.date.to_struct(), gw_snippet=field))
+                    ).format(date=e.date.__dict__, gw_snippet=field))
                 date.set(modifier=Date.MOD_TEXTONLY, text=field)
             return date
         else:
@@ -1152,8 +1153,7 @@ class GeneWebParser:
             except UnicodeDecodeError:
                 pass
 
-        return( s)
+        return(s)
 
-    def debug( self, txt):
-        if enable_debug:
-            print(txt)
+    def debug(self, txt):
+        LOG.debug(txt)

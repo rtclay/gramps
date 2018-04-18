@@ -117,7 +117,8 @@ def create_web_connect_menu(dbstate, uistate, nav_group, handle):
     retval.extend(actions)
     return retval
 
-def create_quickreport_menu(category,dbstate,uistate, handle) :
+
+def create_quickreport_menu(category, dbstate, uistate, handle, track=[]):
     """ This functions querries the registered quick reports with
             quick_report_list of _PluginMgr.py
         It collects the reports of the requested category, which must be one of
@@ -154,14 +155,16 @@ def create_quickreport_menu(category,dbstate,uistate, handle) :
         new_key = pdata.id.replace(' ', '-')
         ofile.write('<menuitem action="%s"/>' % new_key)
         actions.append((new_key, None, pdata.name, None, None,
-                make_quick_report_callback(pdata, category,
-                                           dbstate, uistate, handle)))
+                make_quick_report_callback(pdata, category, dbstate,
+                                           uistate, handle, track=track)))
     ofile.write('</menu>')
 
     return (ofile.getvalue(), actions)
 
-def make_quick_report_callback(pdata, category, dbstate, uistate, handle):
-    return lambda x: run_report(dbstate, uistate, category, handle, pdata)
+def make_quick_report_callback(pdata, category, dbstate, uistate, handle,
+                               track=[]):
+    return lambda x: run_report(dbstate, uistate, category, handle, pdata,
+                                track=track)
 
 def get_quick_report_list(qv_category=None):
     """
@@ -179,7 +182,7 @@ def get_quick_report_list(qv_category=None):
     return names
 
 def run_quick_report_by_name(dbstate, uistate, report_name, handle,
-                             container=None, **kwargs):
+                             container=None, track=[], **kwargs):
     """
     Run a QuickView by name.
     **kwargs provides a way of passing special quick views additional
@@ -193,7 +196,8 @@ def run_quick_report_by_name(dbstate, uistate, report_name, handle,
             break
     if report:
         return run_report(dbstate, uistate, report.category,
-                          handle, report, container=container, **kwargs)
+                          handle, report, container=container,
+                          track=track, **kwargs)
     else:
         raise AttributeError("No such quick report '%s'" % report_name)
 
@@ -226,7 +230,7 @@ def run_quick_report_by_name_direct(report_name, database, document, handle):
         raise AttributeError("No such quick report id = '%s'" % report_name)
 
 def run_report(dbstate, uistate, category, handle, pdata, container=None,
-               **kwargs):
+               track=[], **kwargs):
         """
         Run a Quick Report.
         Optionally container can be passed, rather than putting the report
@@ -241,7 +245,7 @@ def run_report(dbstate, uistate, category, handle, pdata, container=None,
             return
         func =  eval('mod.' +  pdata.runfunc)
         if handle:
-            d = TextBufDoc(make_basic_stylesheet(), None)
+            d = TextBufDoc(make_basic_stylesheet(), None, track=track)
             d.dbstate = dbstate
             d.uistate = uistate
             if isinstance(handle, str): # a handle
@@ -256,14 +260,12 @@ def run_report(dbstate, uistate, category, handle, pdata, container=None,
                 elif category == CATEGORY_QR_CITATION :
                     obj = dbstate.db.get_citation_from_handle(handle)
                 elif category == CATEGORY_QR_SOURCE_OR_CITATION :
-                    source = dbstate.db.get_source_from_handle(handle)
-                    citation = dbstate.db.get_citation_from_handle(handle)
-                    if (not source and not citation) or (source and citation):
-                        raise ValueError("selection must be either source or citation")
-                    if citation:
-                        obj = citation
+                    if dbstate.db.has_source_handle(handle):
+                        obj = dbstate.db.get_source_from_handle(handle)
+                    elif dbstate.db.has_citation_handle(handle):
+                        obj = dbstate.db.get_citation_from_handle(handle)
                     else:
-                        obj = source
+                        raise ValueError("selection must be either source or citation")
                 elif category == CATEGORY_QR_PLACE :
                     obj = dbstate.db.get_place_from_handle(handle)
                 elif category == CATEGORY_QR_MEDIA :

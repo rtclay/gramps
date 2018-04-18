@@ -47,8 +47,8 @@ class DbRandomTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.db = make_database("inmemorydb")
-        cls.db.load(None)
+        cls.db = make_database("sqlite")
+        cls.db.load(":memory:")
 
     def setUp(self):
         self.handles = {'Person': [], 'Family': [], 'Event': [], 'Place': [],
@@ -144,11 +144,15 @@ class DbRandomTest(unittest.TestCase):
     # Test get_*_handles methods
     #
     ################################################################
-    def __get_handles_test(self, obj_type, handles_func, number_func):
-        handles = handles_func()
+    def __get_handles_test(self, obj_type, handles_func, number_func,
+                           sort_handles=False):
+        if sort_handles:
+            handles = handles_func(sort_handles=True)
+        else:
+            handles = handles_func()
         self.assertEqual(len(handles), number_func())
         for handle in handles:
-            self.assertIn(handle.decode('utf8'), self.handles[obj_type])
+            self.assertIn(handle, self.handles[obj_type])
 
     def test_get_person_handles(self):
         self.__get_handles_test('Person',
@@ -199,6 +203,48 @@ class DbRandomTest(unittest.TestCase):
         self.__get_handles_test('Tag',
                                 self.db.get_tag_handles,
                                 self.db.get_number_of_tags)
+
+    def test_get_person_handles_sort(self):
+        self.__get_handles_test('Person',
+                                self.db.get_person_handles,
+                                self.db.get_number_of_people,
+                                sort_handles=True)
+
+    def test_get_family_handles_sort(self):
+        self.__get_handles_test('Family',
+                                self.db.get_family_handles,
+                                self.db.get_number_of_families,
+                                sort_handles=True)
+
+    def test_get_place_handles_sort(self):
+        self.__get_handles_test('Place',
+                                self.db.get_place_handles,
+                                self.db.get_number_of_places,
+                                sort_handles=True)
+
+    def test_get_source_handles_sort(self):
+        self.__get_handles_test('Source',
+                                self.db.get_source_handles,
+                                self.db.get_number_of_sources,
+                                sort_handles=True)
+
+    def test_get_citation_handles_sort(self):
+        self.__get_handles_test('Citation',
+                                self.db.get_citation_handles,
+                                self.db.get_number_of_citations,
+                                sort_handles=True)
+
+    def test_get_media_handles_sort(self):
+        self.__get_handles_test('Media',
+                                self.db.get_media_handles,
+                                self.db.get_number_of_media,
+                                sort_handles=True)
+
+    def test_get_tag_handles_sort(self):
+        self.__get_handles_test('Tag',
+                                self.db.get_tag_handles,
+                                self.db.get_number_of_tags,
+                                sort_handles=True)
 
     ################################################################
     #
@@ -266,7 +312,7 @@ class DbRandomTest(unittest.TestCase):
         for handle in handles_func():
             person = get_func(handle)
             self.assertIsInstance(person, obj_class)
-            self.assertEqual(person.handle, handle.decode('utf8'))
+            self.assertEqual(person.handle, handle)
 
     def test_get_person_from_handle(self):
         self.__get_from_handle_test(Person,
@@ -641,6 +687,16 @@ class DbRandomTest(unittest.TestCase):
         person = self.db.find_initial_person()
         self.assertEqual(person.handle, default_handle)
 
+    ################################################################
+    #
+    # Test get_total method
+    #
+    ################################################################
+    def test_get_total(self):
+        total = sum([len(self.handles[obj_type])
+                     for obj_type in self.handles.keys()])
+        self.assertEqual(self.db.get_total(), total)
+
 #-------------------------------------------------------------------------
 #
 # DbEmptyTest class
@@ -653,8 +709,8 @@ class DbEmptyTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.db = make_database("inmemorydb")
-        cls.db.load(None)
+        cls.db = make_database("sqlite")
+        cls.db.load(":memory:")
 
     ################################################################
     #
@@ -663,16 +719,16 @@ class DbEmptyTest(unittest.TestCase):
     ################################################################
 
     def test_metadata(self):
-        self.db.set_metadata('test-key', 'test-value')
-        value = self.db.get_metadata('test-key')
+        self.db._set_metadata('test-key', 'test-value')
+        value = self.db._get_metadata('test-key')
         self.assertEqual(value, 'test-value')
 
     def test_metadata_missing(self):
-        value = self.db.get_metadata('missing-key')
+        value = self.db._get_metadata('missing-key')
         self.assertEqual(value, [])
 
     def test_metadata_default(self):
-        value = self.db.get_metadata('missing-key', default='default-value')
+        value = self.db._get_metadata('missing-key', default='default-value')
         self.assertEqual(value, 'default-value')
 
     ################################################################
@@ -730,6 +786,14 @@ class DbEmptyTest(unittest.TestCase):
         mapping = self.db.get_name_group_mapping('Clark')
         self.assertEqual(mapping, 'Clarke')
 
+    ################################################################
+    #
+    # Test get_total method
+    #
+    ################################################################
+    def test_get_total(self):
+        self.assertEqual(self.db.get_total(), 0)
+
 #-------------------------------------------------------------------------
 #
 # DbPersonTest class
@@ -742,8 +806,8 @@ class DbPersonTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.db = make_database("inmemorydb")
-        cls.db.load(None)
+        cls.db = make_database("sqlite")
+        cls.db.load(":memory:")
 
     def __add_person(self, gender, first_name, surname, trans):
         person = Person()

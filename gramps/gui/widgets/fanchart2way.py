@@ -44,11 +44,11 @@ import math
 import colorsys
 import sys
 import pickle
-from cgi import escape
+from html import escape
 
 #-------------------------------------------------------------------------
 #
-# GRAMPS modules
+# Gramps modules
 #
 #-------------------------------------------------------------------------
 from gramps.gen.display.name import displayer as name_displayer
@@ -374,7 +374,9 @@ class FanChart2WayWidget(FanChartWidget, FanChartDescWidget):
         cr.scale(scale, scale)
         if widget:
             self.center_xy = self.center_xy_from_delta()
-        cr.translate(*self.center_xy)
+            cr.translate(*self.center_xy)
+        else:
+            cr.translate(halfdist, halfdist)
 
         cr.save()
         # Draw background

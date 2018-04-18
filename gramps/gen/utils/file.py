@@ -61,7 +61,7 @@ def find_file( filename):
     try:
         if os.path.isfile(filename):
             return(filename)
-    except UnicodeError:
+    except UnicodeError as err:
         LOG.error("Filename %s raised a Unicode Error %s.", repr(filename), err)
 
     LOG.debug("Filename %s not found.", repr(filename))
@@ -137,18 +137,25 @@ def relative_path(original, base):
     base_list = [_f for _f in base_list if _f]
     target_list = [_f for _f in target_list if _f]
     i = -1
+    # base path is normcase (lower case on Windows) so compare target in lower
+    # on Windows as well
     for i in range(min(len(base_list), len(target_list))):
-        if base_list[i] != target_list[i]: break
+        if win():
+            if base_list[i].lower() != target_list[i].lower():
+                break
+        else:
+            if base_list[i] != target_list[i]:
+                break
     else:
         #if break did not happen we are here at end, and add 1.
         i += 1
-    rel_list = [os.pardir] * (len(base_list)-i) + target_list[i:]
+    rel_list = [os.pardir] * (len(base_list) - i) + target_list[i:]
     return os.path.join(*rel_list)
 
 def expand_path(path, normalize = True):
     """
     Expand environment variables in a path
-    Uses both the environment variables and the GRAMPS environment
+    Uses both the environment variables and the Gramps environment
     The expansion uses the str.format, e.g. "~/{GRAMPSHOME}/{VERSION}/filename.txt"
     We make the assumption that the user will not use a path that contain variable names
     (it is technically possible to use characters "{", "}" in  paths)
@@ -220,6 +227,24 @@ def search_for(name):
             if os.access(fname, os.X_OK) and not os.path.isdir(fname):
                 return 1
     return 0
+
+
+def where_is(name):
+    """ This command is similar to the Linux "whereis -b file" command.
+    It looks for an executable file (name) in the PATH python is using, as
+    well as several likely other paths.  It returns the first file found,
+    or an empty string if not found.
+    """
+    paths = set(os.environ['PATH'].split(os.pathsep))
+    if not win():
+        paths.update(("/bin", "/usr/bin", "/usr/local/bin", "/opt/local/bin",
+                      "/opt/bin"))
+    for i in paths:
+        fname = os.path.join(i, name)
+        if os.access(fname, os.X_OK) and not os.path.isdir(fname):
+            return fname
+    return ""
+
 
 def create_checksum(full_path):
     """

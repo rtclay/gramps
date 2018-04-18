@@ -22,7 +22,7 @@
 #
 
 """
-Package providing filter rules for GRAMPS.
+Package providing filter rules for Gramps.
 """
 
 from ._disconnected import Disconnected
@@ -109,6 +109,7 @@ from ._matchidof import MatchIdOf
 from ._regexpidof import RegExpIdOf
 from ._changedsince import ChangedSince
 from ._isrelatedwith import IsRelatedWith
+from ._hassoundexname import HasSoundexName
 
 #-------------------------------------------------------------------------
 #
@@ -186,8 +187,10 @@ editor_rule_list = [
     HasNote,
     HasNoteRegexp,
     RegExpIdOf,
+    RegExpName,
     Disconnected,
     ChangedSince,
     IsRelatedWith,
+    HasSoundexName,
 ]
 

@@ -101,6 +101,12 @@ class PluginDialog(ManagedWindow):
         self.title = self.dialog.get_object("title")
 
         self.set_window(window, self.title, msg)
+        if content == _REPORTS:
+            self.setup_configs('interface.reportplugindialog', 600, 400)
+        elif content == _TOOLS:
+            self.setup_configs('interface.toolplugindialog', 600, 400)
+        else:
+            raise ValueError("PluginDialog selection must be a report or tool")
 
         self.store = Gtk.TreeStore(str)
         self.selection = self.tree.get_selection()
@@ -170,6 +176,7 @@ class PluginDialog(ManagedWindow):
         self.title.set_text('<span weight="bold" size="larger">%s</span>' \
                             % pdata.name)
         self.title.set_use_markup(1)
+        # TODO for Arabic, should the next two lines' commas be translated?
         self.author_name.set_text(', '.join(pdata.authors))
         self.author_email.set_text(', '.join(pdata.authors_email))
         self.item = pdata

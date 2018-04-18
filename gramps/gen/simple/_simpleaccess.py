@@ -25,7 +25,7 @@ Provide a simplified database access interface to the Gramps database.
 """
 from ..lib import (Person, Family, Event, Source, Place, Citation,
                    Media, Repository, Note, Date, Tag)
-from ..lib.handle import Handle
+from ..errors import HandleError
 from ..datehandler import displayer
 from ..utils.string import gender as gender_map
 from ..utils.db import get_birth_or_fallback, get_death_or_fallback
@@ -382,10 +382,11 @@ class SimpleAccess:
                 if family:
                     reflist = family.get_event_ref_list()
                     if reflist:
+                        # 'evnt' should be renamed to 'event'?
                         elist = [ self.dbase.get_event_from_handle(ref.ref)
                                   for ref in reflist ]
                         events = [ evnt for evnt in elist
-                                   if event.type == EventType.MARRIAGE ]
+                                   if evnt.type == EventType.MARRIAGE ]
                         if events:
                             return place_displayer.display_event(self.dbase, events[0])
         return ''
@@ -416,7 +417,7 @@ class SimpleAccess:
                         elist = [ self.dbase.get_event_from_handle(ref.ref)
                                   for ref in reflist ]
                         events = [ evnt for evnt in elist
-                                   if event.type == EventType.MARRIAGE ]
+                                   if evnt.type == EventType.MARRIAGE ]
                         if events:
                             date_obj = events[0].get_date_object()
                             if date_obj:
@@ -960,9 +961,13 @@ class SimpleAccess:
         :param prop: "gramps_id", or "handle"
         :param value: gramps_id or handle.
         """
-        if object_class in self.dbase.get_table_names():
-            obj = self.dbase.get_table_metadata(object_class)\
-                           [prop + "_func"](value)
+        func = self.dbase.method('get_%s_from_%s', object_class, prop)
+        if func:
+            try:
+                obj = func(value)
+            except HandleError:
+                # Deals with deleted objects referenced in Note Links
+                obj = None
             if obj:
                 if isinstance(obj, Person):
                     return "%s: %s [%s]" % (_(object_class),
@@ -1008,8 +1013,6 @@ class SimpleAccess:
                     return "Error: incorrect object class in display: '%s'" % type(obj)
             else:
                 return "Error: missing object"
-        elif object_class == "Handle":
-            return "%s.handle [%s]" % (prop, value)
         else:
             return "Error: invalid object class in display: '%s'" % object_class
 
@@ -1018,8 +1021,9 @@ class SimpleAccess:
         Given a object, return a string describing the object.
         """
         if prop and value:
-            if self.dbase.get_table_metadata(obj):
-                obj = self.dbase.get_table_metadata(obj)[prop + "_func"](value)
+            func = self.dbase.method('get_%s_from_%s', object_class, prop)
+            if func:
+                obj = func(value)
         if isinstance(obj, Person):
             return "%s [%s]" % (self.name(obj),
                                 self.gid(obj))
@@ -1050,8 +1054,6 @@ class SimpleAccess:
                                 self.gid(obj))
         elif isinstance(obj, Tag):
             return "[%s]" % (obj.name)
-        elif isinstance(obj, Handle):
-            return "%s.handle [%s]" % (prop, obj.handle)
         else:
             return "Error: incorrect object class in describe: '%s'" % type(obj)
 
@@ -1063,27 +1065,6 @@ class SimpleAccess:
         :param prop: "gramps_id", or "handle"
         :param value: gramps_id or handle.
         """
-        if object_class in self.dbase.get_table_names():
-            return self.dbase.get_table_metadata(object_class) \
-                [prop + "_func"](value)
-
-def by_date(event1, event2):
-    """
-    Sort function that will compare two events by their dates.
-
-    :param event1: first event
-    :type event1: :py:class:`.Event`
-    :param event2: second event
-    :type event2: :py:class:`.Event`
-    :return: Returns -1 if event1 < event2, 0 if they are equal, and
-       1 if they are the same.
-    :rtype: int
-    """
-    if event1 and event2:
-        return cmp(event1.get_date_object() , event2.get_date_object())
-    elif event1:
-        return -1
-    elif event2:
-        return 1
-    else:
-        return 0
+        func = self.dbase.method('get_%s_from_%s', object_class, prop)
+        if func:
+            return func(value)

@@ -90,7 +90,6 @@ class BookItem:
         """
         self.dbase = dbase
         self.style_name = "default"
-        self.was_reconfigured = False # has the item been reconfigured?
         pmgr = BasePluginManager.get_instance()
 
         for pdata in pmgr.get_reg_bookitems():
@@ -179,7 +178,6 @@ class Book:
         self.paper_format = None
         self.paper_output = None
         self.item_list = []
-        self.was_reconfigured = False # has the book been reconfigured?
         if obj:
             if exact_copy:
                 self.item_list = obj.item_list
@@ -188,8 +186,12 @@ class Book:
                     new_item = BookItem(item.dbase, item.get_name())
                     orig_opt_dict = item.option_class.handler.options_dict
                     new_opt_dict = new_item.option_class.handler.options_dict
+                    menu = new_item.option_class.menu
                     for optname in orig_opt_dict:
                         new_opt_dict[optname] = orig_opt_dict[optname]
+                        menu_option = menu.get_option_by_name(optname)
+                        if menu_option:
+                            menu_option.set_value(new_opt_dict[optname])
                     new_item.set_style_name(item.get_style_name())
                     self.item_list.append(new_item)
 
@@ -493,14 +495,14 @@ class BookList:
         """
         Saves the current BookList to the associated file.
         """
-        with open(self.file, "w") as b_f:
+        with open(self.file, "w", encoding="utf-8") as b_f:
             b_f.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")
             b_f.write('<booklist>\n')
             for name in sorted(self.bookmap): # enable a diff of archived copies
                 book = self.get_book(name)
-                dbname = book.get_dbname()
+                dbname = escape(book.get_dbname())
                 b_f.write('  <book name="%s" database="%s">'
-                          '\n' % (name, dbname))
+                          '\n' % (escape(name), dbname))
                 for item in book.get_item_list():
                     b_f.write('    <item name="%s" '
                               'trans_name="%s">\n' % (
@@ -564,7 +566,7 @@ class BookList:
                               '\n' % book.get_format_name())
                 if book.get_output():
                     b_f.write('    <output name="%s"/>'
-                              '\n' % book.get_output())
+                              '\n' % escape(book.get_output()))
                 b_f.write('  </book>\n')
 
             b_f.write('</booklist>\n')
@@ -576,8 +578,15 @@ class BookList:
         try:
             parser = make_parser()
             parser.setContentHandler(BookParser(self, self.dbase))
-            with open(self.file) as the_file:
-                parser.parse(the_file)
+            # bug 10387; XML should be utf8, but was not previously saved
+            # that way.  So try to read utf8, if fails, try with system
+            # encoding.  Only an issue on non-utf8 systems.
+            try:
+                with open(self.file, encoding="utf-8") as the_file:
+                    parser.parse(the_file)
+            except UnicodeDecodeError:
+                with open(self.file) as the_file:
+                    parser.parse(the_file)
         except (IOError, OSError, ValueError, SAXParseException, KeyError,
                 AttributeError):
             LOG.debug("Failed to parse book list", exc_info=True)

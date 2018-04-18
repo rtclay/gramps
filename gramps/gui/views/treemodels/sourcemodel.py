@@ -49,8 +49,8 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 #-------------------------------------------------------------------------
 class SourceModel(FlatBaseModel):
 
-    def __init__(self, db, scol=0, order=Gtk.SortType.ASCENDING, search=None,
-                 skip=set(), sort_map=None):
+    def __init__(self, db, uistate, scol=0, order=Gtk.SortType.ASCENDING,
+                 search=None, skip=set(), sort_map=None):
         self.map = db.get_raw_source_data
         self.gen_cursor = db.get_source_cursor
         self.fmap = [
@@ -75,8 +75,8 @@ class SourceModel(FlatBaseModel):
             self.sort_change,
             self.column_tag_color
             ]
-        FlatBaseModel.__init__(self, db, scol, order, search=search, skip=skip,
-                               sort_map=sort_map)
+        FlatBaseModel.__init__(self, db, uistate, scol, order, search=search,
+                               skip=skip, sort_map=sort_map)
 
     def destroy(self):
         """
@@ -99,7 +99,7 @@ class SourceModel(FlatBaseModel):
         return len(self.fmap)+1
 
     def column_title(self,data):
-        return data[2]
+        return data[2].replace('\n', ' ')
 
     def column_author(self,data):
         return data[3]
@@ -143,7 +143,7 @@ class SourceModel(FlatBaseModel):
         tag_handle = data[0]
         cached, value = self.get_cached_value(tag_handle, "TAG_COLOR")
         if not cached:
-            tag_color = "#000000000000"
+            tag_color = ""
             tag_priority = None
             for handle in data[11]:
                 tag = self.db.get_tag_from_handle(handle)
@@ -161,4 +161,5 @@ class SourceModel(FlatBaseModel):
         Return the sorted list of tags.
         """
         tag_list = list(map(self.get_tag_name, data[11]))
+        # TODO for Arabic, should the next line's comma be translated?
         return ', '.join(sorted(tag_list, key=glocale.sort_key))

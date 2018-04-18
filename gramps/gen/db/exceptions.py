@@ -25,8 +25,8 @@
 # Gramps modules
 #
 #-------------------------------------------------------------------------
-from gramps.gen.const import URL_WIKISTRING, URL_MANUAL_PAGE
-from gramps.gen.const import GRAMPS_LOCALE as glocale
+from ..const import URL_WIKISTRING, URL_MANUAL_PAGE
+from ..const import GRAMPS_LOCALE as glocale
 _ = glocale.translation.gettext
 
 #-------------------------------------------------------------------------
@@ -342,6 +342,23 @@ class PythonUpgradeRequiredError(Exception):
                      'bold_end'    : '</b>' ,
                      'db_python_version': self.db_python_version,
                      'current_python_version': self.current_python_version }
+
+class DbConnectionError(Exception):
+    """
+    Error used to report that a database connection failed.
+    """
+    def __init__(self, msg, settings_file):
+        Exception.__init__(self)
+        self.msg = msg
+        self.settings_file = settings_file
+
+    def __str__(self):
+        return _('Database connection failed.\n\n'
+                 '%(message)s\n'
+                 'Please check your connection settings file:\n'
+                 '%(settings_file)s') % {
+                    'message': self.msg,
+                    'settings_file': self.settings_file}
 
 if __name__ == "__main__":
     """

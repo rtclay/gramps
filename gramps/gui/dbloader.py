@@ -65,12 +65,14 @@ from gramps.gen.db.exceptions import (DbUpgradeRequiredError,
                                       BsddbUpgradeRequiredError,
                                       BsddbDowngradeRequiredError,
                                       PythonUpgradeRequiredError,
-                                      PythonDowngradeError)
+                                      PythonDowngradeError,
+                                      DbConnectionError)
 from .pluginmanager import GuiPluginManager
 from .dialog import (DBErrorDialog, ErrorDialog, QuestionDialog2,
                             WarningDialog)
 from .user import User
 from gramps.gen.errors import DbError
+from .managedwindow import ManagedWindow
 
 #-------------------------------------------------------------------------
 #
@@ -108,18 +110,6 @@ class DbLoader(CLIDbLoader):
                           parent=self.uistate.window)
             _LOG.error(str(msg) +"\n" + exc)
 
-    def _begin_progress(self):
-        self.uistate.set_busy_cursor(True)
-        self.uistate.progress.show()
-        self.uistate.pulse_progressbar(0)
-
-    def _pulse_progress(self, value):
-        self.uistate.pulse_progressbar(value)
-
-    def _end_progress(self):
-        self.uistate.set_busy_cursor(False)
-        self.uistate.progress.hide()
-
     def import_file(self):
         self.import_info = None
         # First thing first: import is a batch transaction
@@ -138,142 +128,11 @@ class DbLoader(CLIDbLoader):
             if not warn_dialog.run():
                 return False
 
-        pmgr = GuiPluginManager.get_instance()
+        GrampsImportFileDialog(self.dbstate, self.uistate,
+                               callback=self.set_info)
 
-        import_dialog = Gtk.FileChooserDialog(_('Gramps: Import Family Tree'),
-                                       self.uistate.window,
-                                       Gtk.FileChooserAction.OPEN,
-                                       (_('_Cancel'),
-                                            Gtk.ResponseType.CANCEL,
-                                        _('Import'),
-                                            Gtk.ResponseType.OK))
-        import_dialog.set_local_only(False)
-
-        # Always add automatic (match all files) filter
-        add_all_files_filter(import_dialog)   # *
-
-        # Add more file type selections for available importers
-        for plugin in pmgr.get_import_plugins():
-            file_filter = Gtk.FileFilter()
-            name = "%s (.%s)" % (plugin.get_name(), plugin.get_extension())
-            file_filter.set_name(name)
-            file_filter.add_pattern("*.%s" % plugin.get_extension())
-            file_filter.add_pattern(plugin.get_extension().capitalize())
-            import_dialog.add_filter(file_filter)
-
-        (box, type_selector) = format_maker()
-        import_dialog.set_extra_widget(box)
-
-        # Suggested folder: try last open file, import, then last export,
-        # then home.
-        default_dir = config.get('paths.recent-import-dir')
-        if len(default_dir)<=1:
-            default_dir = get_default_dir()
-
-        import_dialog.set_current_folder(default_dir)
-        while True:
-            response = import_dialog.run()
-            if response in (Gtk.ResponseType.CANCEL, Gtk.ResponseType.DELETE_EVENT):
-                break
-            elif response == Gtk.ResponseType.OK:
-                filename = import_dialog.get_filename()
-                if self.check_errors(filename):
-                    # displays errors if any
-                    continue
-
-                (the_path, the_file) = os.path.split(filename)
-                config.set('paths.recent-import-dir', the_path)
-
-                extension = type_selector.get_value()
-                if extension == 'auto':
-                    # Guess the file format based on the file extension.
-                    # This will get the lower case extension without a period,
-                    # or an empty string.
-                    extension = os.path.splitext(filename)[-1][1:].lower()
-
-                for plugin in pmgr.get_import_plugins():
-                    if extension == plugin.get_extension():
-                        self.do_import(import_dialog,
-                                       plugin.get_import_function(),
-                                       filename)
-                        return True
-
-                # Finally, we give up and declare this an unknown format
-                ErrorDialog(
-                    _("Could not open file: %s") % filename,
-                    _('File type "%s" is unknown to Gramps.\n\n'
-                      'Valid types are: Gramps database, Gramps XML, '
-                      'Gramps package, GEDCOM, and others.') % extension,
-                    parent=self.uistate.window)
-
-        import_dialog.destroy()
-        return False
-
-    def check_errors(self, filename):
-        """
-        Run common error checks and return True if any found.
-
-        In this process, a warning dialog can pop up.
-
-        """
-        if not isinstance(filename, str):
-            return True
-
-        filename = os.path.normpath(os.path.abspath(filename))
-
-        if len(filename) == 0:
-            return True
-        elif os.path.isdir(filename):
-            ErrorDialog(
-                _('Cannot open file'),
-                _('The selected file is a directory, not a file.\n'),
-                parent=self.uistate.window)
-            return True
-        elif os.path.exists(filename):
-            if not os.access(filename, os.R_OK):
-                ErrorDialog(
-                    _('Cannot open file'),
-                    _('You do not have read access to the selected file.'),
-                    parent=self.uistate.window)
-                return True
-        else:
-            try:
-                f = file(filename,'w')
-                f.close()
-                os.remove(filename)
-            except IOError:
-                ErrorDialog(
-                    _('Cannot create file'),
-                    _('You do not have write access to the selected file.'),
-                    parent=self.uistate.window)
-                return True
-
-        return False
-
-    def do_import(self, dialog, importer, filename):
-        self.import_info = None
-        dialog.destroy()
-        self._begin_progress()
-
-        try:
-            #an importer can return an object with info, object.info_text()
-            #returns that info. Otherwise None is set to import_info
-            self.import_info = importer(self.dbstate.db, filename,
-                            User(callback=self._pulse_progress,
-                                 uistate=self.uistate,
-                                 dbstate=self.dbstate))
-            dirname = os.path.dirname(filename) + os.path.sep
-            config.set('paths.recent-import-dir', dirname)
-        except UnicodeError as msg:
-            ErrorDialog(
-                _("Could not import file: %s") % filename,
-                _("This file incorrectly identifies its character "
-                  "set, so it cannot be accurately imported. Please fix the "
-                  "encoding, and import again") + "\n\n %s" % msg,
-                parent=self.uistate.window)
-        except Exception:
-            _LOG.error("Failed to import database.", exc_info=True)
-        self._end_progress()
+    def set_info(self, info):
+        self.import_info = info
 
     def import_info_text(self):
         """
@@ -285,7 +144,7 @@ class DbLoader(CLIDbLoader):
             return ""
         return self.import_info.info_text()
 
-    def read_file(self, filename):
+    def read_file(self, filename, username=None, password=None):
         """
         This method takes care of changing database, and loading the data.
         In 3.0 we only allow reading of real databases of filetype
@@ -322,6 +181,13 @@ class DbLoader(CLIDbLoader):
         db.disable_signals()
         self.dbstate.no_database()
 
+        if db.requires_login() and username is None:
+            login = GrampsLoginDialog(self.uistate)
+            credentials = login.run()
+            if credentials is None:
+                return
+            username, password = credentials
+
         self._begin_progress()
 
         force_schema_upgrade = False
@@ -335,8 +201,9 @@ class DbLoader(CLIDbLoader):
                             mode, force_schema_upgrade,
                             force_bsddb_upgrade,
                             force_bsddb_downgrade,
-                            force_python_upgrade)
-                    db.set_save_path(filename)
+                            force_python_upgrade,
+                            username=username,
+                            password=password)
                     if self.dbstate.is_open():
                         self.dbstate.db.close(
                             user=User(callback=self._pulse_progress,
@@ -420,6 +287,9 @@ class DbLoader(CLIDbLoader):
         except PythonDowngradeError as msg:
             self.dbstate.no_database()
             self._warn( _("Cannot open database"), str(msg))
+        except DbConnectionError as msg:
+            self.dbstate.no_database()
+            self._warn(_("Cannot open database"), str(msg))
         except OSError as msg:
             self.dbstate.no_database()
             self._errordialog(
@@ -521,3 +391,218 @@ def format_maker():
     box.add(type_selector)
     box.show_all()
     return (box, type_selector)
+
+class GrampsLoginDialog(ManagedWindow):
+
+    def __init__(self, uistate):
+        """
+        A login dialog to obtain credentials to connect to a database
+        """
+        self.title = _("Login")
+        ManagedWindow.__init__(self, uistate, [], self.__class__, modal=True)
+
+        dialog = Gtk.Dialog(parent=uistate.window)
+        grid = Gtk.Grid()
+        grid.set_border_width(6)
+        grid.set_row_spacing(6)
+        grid.set_column_spacing(6)
+        label = Gtk.Label(label=_('Username: '))
+        grid.attach(label, 0, 0, 1, 1)
+        self.username = Gtk.Entry()
+        self.username.set_hexpand(True)
+        grid.attach(self.username, 1, 0, 1, 1)
+        label = Gtk.Label(label=_('Password: '))
+        grid.attach(label, 0, 1, 1, 1)
+        self.password = Gtk.Entry()
+        self.password.set_hexpand(True)
+        self.password.set_visibility(False)
+        self.password.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+        grid.attach(self.password, 1, 1, 1, 1)
+        dialog.vbox.pack_start(grid, True, True, 0)
+        dialog.add_buttons(_('_Cancel'), Gtk.ResponseType.CANCEL,
+                           _('Login'), Gtk.ResponseType.OK)
+        self.set_window(dialog, None, self.title)
+
+    def run(self):
+        self.show()
+        response = self.window.run()
+        username = self.username.get_text()
+        password = self.password.get_text()
+        if response == Gtk.ResponseType.CANCEL:
+            self.close()
+            return None
+        elif response == Gtk.ResponseType.OK:
+            self.close()
+            return (username, password)
+
+class GrampsImportFileDialog(ManagedWindow):
+
+    def __init__(self, dbstate, uistate, callback=None):
+        """
+        A dialog to import a file into Gramps
+        """
+        self.dbstate = dbstate
+
+        self.title = _("Import Family Tree")
+        ManagedWindow.__init__(self, uistate, [], self.__class__, modal=True)
+        # the import_dialog.run() below makes it modal, so any change to
+        # the previous line's "modal" would require that line to be changed
+
+        pmgr = GuiPluginManager.get_instance()
+
+        import_dialog = Gtk.FileChooserDialog(
+            title='', transient_for=self.uistate.window,
+            action=Gtk.FileChooserAction.OPEN)
+        import_dialog.add_buttons(_('_Cancel'), Gtk.ResponseType.CANCEL,
+                                  _('Import'), Gtk.ResponseType.OK)
+        self.set_window(import_dialog, None, self.title)
+        self.setup_configs('interface.grampsimportfiledialog', 780, 630)
+        import_dialog.set_local_only(False)
+
+        # Always add automatic (match all files) filter
+        add_all_files_filter(import_dialog)   # *
+
+        # Add more file type selections for available importers
+        for plugin in pmgr.get_import_plugins():
+            file_filter = Gtk.FileFilter()
+            name = "%s (.%s)" % (plugin.get_name(), plugin.get_extension())
+            file_filter.set_name(name)
+            file_filter.add_pattern("*.%s" % plugin.get_extension())
+            file_filter.add_pattern(plugin.get_extension().capitalize())
+            import_dialog.add_filter(file_filter)
+
+        (box, type_selector) = format_maker()
+        import_dialog.set_extra_widget(box)
+
+        # Suggested folder: try last open file, import, then last export,
+        # then home.
+        default_dir = config.get('paths.recent-import-dir')
+        if len(default_dir)<=1:
+            default_dir = get_default_dir()
+
+        import_dialog.set_current_folder(default_dir)
+        while True:
+            # the import_dialog.run() makes it modal, so any change to that
+            # line would require the ManagedWindow.__init__ to be changed also
+            response = import_dialog.run()
+            if response in (Gtk.ResponseType.CANCEL,
+                            Gtk.ResponseType.DELETE_EVENT):
+                break
+            elif response == Gtk.ResponseType.OK:
+                filename = import_dialog.get_filename()
+                if self.check_errors(filename):
+                    # displays errors if any
+                    continue
+
+                (the_path, the_file) = os.path.split(filename)
+                config.set('paths.recent-import-dir', the_path)
+
+                extension = type_selector.get_value()
+                if extension == 'auto':
+                    # Guess the file format based on the file extension.
+                    # This will get the lower case extension without a period,
+                    # or an empty string.
+                    extension = os.path.splitext(filename)[-1][1:].lower()
+
+                for plugin in pmgr.get_import_plugins():
+                    if extension == plugin.get_extension():
+                        self.do_import(import_dialog,
+                                       plugin.get_import_function(),
+                                       filename)
+                        self.close()
+                        if callback is not None:
+                            callback(self.import_info)
+                        return
+
+                # Finally, we give up and declare this an unknown format
+                ErrorDialog(
+                    _("Could not open file: %s") % filename,
+                    _('File type "%s" is unknown to Gramps.\n\n'
+                      'Valid types are: Gramps database, Gramps XML, '
+                      'Gramps package, GEDCOM, and others.') % extension,
+                    parent=self.uistate.window)
+
+        self.close()
+
+    def check_errors(self, filename):
+        """
+        Run common error checks and return True if any found.
+
+        In this process, a warning dialog can pop up.
+
+        """
+        if not isinstance(filename, str):
+            return True
+
+        filename = os.path.normpath(os.path.abspath(filename))
+
+        if len(filename) == 0:
+            return True
+        elif os.path.isdir(filename):
+            ErrorDialog(
+                _('Cannot open file'),
+                _('The selected file is a directory, not a file.\n'),
+                parent=self.uistate.window)
+            return True
+        elif os.path.exists(filename):
+            if not os.access(filename, os.R_OK):
+                ErrorDialog(
+                    _('Cannot open file'),
+                    _('You do not have read access to the selected file.'),
+                    parent=self.uistate.window)
+                return True
+        else:
+            try:
+                f = file(filename,'w')
+                f.close()
+                os.remove(filename)
+            except IOError:
+                ErrorDialog(
+                    _('Cannot create file'),
+                    _('You do not have write access to the selected file.'),
+                    parent=self.uistate.window)
+                return True
+
+        return False
+
+    def do_import(self, dialog, importer, filename):
+        self.import_info = None
+        position = self.window.get_position() # crock
+        dialog.hide()
+        self.window.move(position[0], position[1])
+        self._begin_progress()
+
+        try:
+            #an importer can return an object with info, object.info_text()
+            #returns that info. Otherwise None is set to import_info
+            self.import_info = importer(self.dbstate.db, filename,
+                            User(callback=self._pulse_progress,
+                                 uistate=self.uistate,
+                                 dbstate=self.dbstate))
+            dirname = os.path.dirname(filename) + os.path.sep
+            config.set('paths.recent-import-dir', dirname)
+        except UnicodeError as msg:
+            ErrorDialog(
+                _("Could not import file: %s") % filename,
+                _("This file incorrectly identifies its character "
+                  "set, so it cannot be accurately imported. Please fix the "
+                  "encoding, and import again") + "\n\n %s" % msg,
+                parent=self.uistate.window)
+        except Exception:
+            _LOG.error("Failed to import database.", exc_info=True)
+        self._end_progress()
+
+    def build_menu_names(self, obj): # this is meaningless since it's modal
+        return (self.title, None)
+
+    def _begin_progress(self):
+        self.uistate.set_busy_cursor(True)
+        self.uistate.progress.show()
+        self.uistate.pulse_progressbar(0)
+
+    def _pulse_progress(self, value):
+        self.uistate.pulse_progressbar(value)
+
+    def _end_progress(self):
+        self.uistate.set_busy_cursor(False)
+        self.uistate.progress.hide()

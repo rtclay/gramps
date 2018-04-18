@@ -225,7 +225,7 @@ class OsmGps:
             except:
                 ErrorDialog(_("Can't create "
                               "tiles cache directory for '%s'.") %
-                              constants.MAP_TITLE[map_type],
+                              constants.MAP_TITLE[self.current_map],
                             parent=self.uistate.window)
         http_proxy = get_env_var('http_proxy')
         if 0:
@@ -504,7 +504,7 @@ class OsmGps:
         elif event.button == 2 and event.type == Gdk.EventType.BUTTON_RELEASE:
             self.end_selection = current
             self.zone_selection = False
-        elif event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
+        elif Gdk.Event.triggers_context_menu(event):
             self.build_nav_menu(osm, event, lat, lon)
         else:
             self.save_center(lat, lon)

@@ -3,6 +3,7 @@
 # Gramps - a GTK+/GNOME based genealogy program
 #
 # Copyright (C) 2008  Zsolt Foldvari
+# Copyright (C) 2017  Serge Noiraud
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,6 +32,7 @@ from .photo import *
 from .placeentry import *
 from .monitoredwidgets import *
 from .selectionwidget import SelectionWidget, Region
+from .shadebox import *
 from .shortlistcomboentry import *
 from .springseparator import *
 from .statusbar import Statusbar
@@ -44,3 +46,4 @@ from .validatedcomboentry import *
 from .validatedmaskedentry import *
 from .valueaction import *
 from .valuetoolitem import *
+from .placewithin import *

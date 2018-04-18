@@ -47,7 +47,8 @@ LOG = logging.getLogger(".")
 #-------------------------------------------------------------------------
 from gramps.gen.plug import BasePluginManager
 from gramps.gen.plug.docgen import (StyleSheet, StyleSheetList, PaperStyle,
-                                    PAPER_PORTRAIT, PAPER_LANDSCAPE, graphdoc)
+                                    PAPER_PORTRAIT, PAPER_LANDSCAPE, graphdoc,
+                                    treedoc)
 from gramps.gen.plug.menu import (FamilyOption, PersonOption, NoteOption,
                                   MediaOption, PersonListOption, NumberOption,
                                   BooleanOption, DestinationOption, Option,
@@ -56,8 +57,8 @@ from gramps.gen.plug.menu import (FamilyOption, PersonOption, NoteOption,
 from gramps.gen.display.name import displayer as name_displayer
 from gramps.gen.errors import ReportError, FilterError
 from gramps.gen.plug.report import (CATEGORY_TEXT, CATEGORY_DRAW, CATEGORY_BOOK,
-                                    CATEGORY_GRAPHVIZ, CATEGORY_CODE,
-                                    ReportOptions, append_styles)
+                                    CATEGORY_GRAPHVIZ, CATEGORY_TREE,
+                                    CATEGORY_CODE, ReportOptions, append_styles)
 from gramps.gen.plug.report._paper import paper_sizes
 from gramps.gen.const import USER_HOME, DOCGEN_OPTIONS
 from gramps.gen.dbstate import DbState
@@ -120,13 +121,13 @@ def _convert_str_to_match_type(str_val, type_val):
 
         # Search through characters between the brackets
         for char in str_val[1:-1]:
-            if (char == "'" or char == '"') and quote_type == None:
+            if (char == "'" or char == '"') and quote_type is None:
                 # This character starts a string
                 quote_type = char
             elif char == quote_type:
                 # This character ends a string
                 quote_type = None
-            elif quote_type == None and char == ",":
+            elif quote_type is None and char == ",":
                 # This character ends an entry
                 ret_val.append(entry.strip())
                 entry = ""
@@ -250,6 +251,15 @@ class CommandLineReport:
                 if name not in self.option_class.options_dict:
                     self.option_class.options_dict[
                         name] = menu.get_option_by_name(name).get_value()
+        if category == CATEGORY_TREE:
+            # Need to include Genealogy Tree options
+            self.__toptions = treedoc.TreeOptions()
+            menu = self.option_class.menu
+            self.__toptions.add_menu_options(menu)
+            for name in menu.get_all_option_names():
+                if name not in self.option_class.options_dict:
+                    self.option_class.options_dict[
+                        name] = menu.get_option_by_name(name).get_value()
         self.option_class.load_previous_values()
         _validate_options(self.option_class, database)
         self.show = options_str_dict.pop('show', None)
@@ -320,6 +330,10 @@ class CommandLineReport:
             for graph_format in graphdoc.FORMATS:
                 self.options_help['off'][2].append(
                     graph_format["type"] + "\t" + graph_format["descr"])
+        elif self.category == CATEGORY_TREE:
+            for tree_format in treedoc.FORMATS:
+                self.options_help['off'][2].append(
+                    tree_format["type"] + "\t" + tree_format["descr"])
         else:
             self.options_help['off'][2] = "NA"
 
@@ -398,8 +412,10 @@ class CommandLineReport:
                         father = self.database.get_person_from_handle(fhandle)
                         if father:
                             fname = name_displayer.display(father)
-                    text = "%s:\t%s, %s" % (family.get_gramps_id(),
-                                            fname, mname)
+                    # translators: needed for French, Hebrew and Arabic
+                    text = _("%(id)s:\t%(father)s, %(mother)s"
+                            ) % {'id': family.get_gramps_id(),
+                                 'father': fname, 'mother': mname}
                     id_list.append(text)
                 self.options_help[name].append(id_list)
             elif isinstance(option, NoteOption):
@@ -444,7 +460,7 @@ class CommandLineReport:
             else:
                 print(_("Unknown option: %s") % option, file=sys.stderr)
                 print(_("   Valid options are:") +
-                      ", ".join(list(self.options_dict.keys())),
+                      _(", ").join(list(self.options_dict.keys())), # Arabic OK
                       file=sys.stderr)
                 print(_("   Use '%(donottranslate)s' to see description "
                         "and acceptable values"
@@ -496,6 +512,15 @@ class CommandLineReport:
                 # Pick the first one as the default.
                 self.format = graphdoc.FORMATS[0]["class"]
                 _chosen_format = graphdoc.FORMATS[0]["type"]
+        elif self.category == CATEGORY_TREE:
+            for tree_format in treedoc.FORMATS:
+                if tree_format['type'] == self.options_dict['off']:
+                    if not self.format: # choose the first one, not the last
+                        self.format = tree_format["class"]
+            if self.format is None:
+                # Pick the first one as the default.
+                self.format = tree_format.FORMATS[0]["class"]
+                _chosen_format = tree_format.FORMATS[0]["type"]
         else:
             self.format = None
         if _chosen_format and _format_str:
@@ -525,7 +550,7 @@ class CommandLineReport:
             else:
                 print(_("Ignoring unknown option: %s") % opt, file=sys.stderr)
                 print(_("   Valid options are:"),
-                      ", ".join(list(self.options_dict.keys())),
+                      _(", ").join(list(self.options_dict.keys())), # Arabic OK
                       file=sys.stderr)
                 print(_("   Use '%(donottranslate)s' to see description "
                         "and acceptable values"
@@ -663,7 +688,7 @@ def cl_report(database, name, category, report_class, options_class,
                     clr.selected_style,
                     PaperStyle(clr.paper, clr.orien, clr.marginl,
                                clr.marginr, clr.margint, clr.marginb))
-        elif category == CATEGORY_GRAPHVIZ:
+        elif category in [CATEGORY_GRAPHVIZ, CATEGORY_TREE]:
             clr.option_class.handler.doc = clr.format(
                 clr.option_class,
                 PaperStyle(clr.paper, clr.orien, clr.marginl,

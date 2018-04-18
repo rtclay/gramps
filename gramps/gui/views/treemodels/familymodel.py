@@ -56,8 +56,8 @@ invalid_date_format = config.get('preferences.invalid-date-format')
 #-------------------------------------------------------------------------
 class FamilyModel(FlatBaseModel):
 
-    def __init__(self, db, scol=0, order=Gtk.SortType.ASCENDING, search=None,
-                 skip=set(), sort_map=None):
+    def __init__(self, db, uistate, scol=0, order=Gtk.SortType.ASCENDING,
+                 search=None, skip=set(), sort_map=None):
         self.gen_cursor = db.get_family_cursor
         self.map = db.get_raw_family_data
         self.fmap = [
@@ -82,8 +82,8 @@ class FamilyModel(FlatBaseModel):
             self.sort_change,
             self.column_tag_color,
             ]
-        FlatBaseModel.__init__(self, db, scol, order, search=search, skip=skip,
-                               sort_map=sort_map)
+        FlatBaseModel.__init__(self, db, uistate, scol, order, search=search,
+                               skip=skip, sort_map=sort_map)
 
     def destroy(self):
         """
@@ -220,7 +220,7 @@ class FamilyModel(FlatBaseModel):
         tag_handle = data[0]
         cached, tag_color = self.get_cached_value(tag_handle, "TAG_COLOR")
         if not cached:
-            tag_color = "#000000000000"
+            tag_color = ""
             tag_priority = None
             for handle in data[13]:
                 tag = self.db.get_tag_from_handle(handle)
@@ -236,4 +236,5 @@ class FamilyModel(FlatBaseModel):
         Return the sorted list of tags.
         """
         tag_list = list(map(self.get_tag_name, data[13]))
+        # TODO for Arabic, should the next line's comma be translated?
         return ', '.join(sorted(tag_list, key=glocale.sort_key))

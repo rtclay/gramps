@@ -38,9 +38,9 @@ import unittest
 # Gramps modules
 #
 #-------------------------------------------------------------------------
-from gramps.gen.const import TEMP_DIR, USER_HOME, USER_PLUGINS, VERSION
-from gramps.gen.utils.file import media_path, get_empty_tempdir
-from gramps.gen.db.utils import make_database
+from ...const import TEMP_DIR, USER_HOME, USER_PLUGINS, VERSION
+from ...utils.file import media_path, get_empty_tempdir
+from ...db.utils import make_database
 
 #-------------------------------------------------------------------------
 #
@@ -60,7 +60,6 @@ class FileTest(unittest.TestCase):
         # Create database
         db = make_database("bsddb")
         path = get_empty_tempdir("utils_file_test")
-        db.write_version(path)
         db.load(path)
 
         # Test without db.mediapath set

@@ -144,6 +144,7 @@ class RelationshipView(NavigationView):
 
         dbstate.connect('database-changed', self.change_db)
         uistate.connect('nameformat-changed', self.build_tree)
+        uistate.connect('placeformat-changed', self.build_tree)
         self.redrawing = False
 
         self.child = None
@@ -159,6 +160,16 @@ class RelationshipView(NavigationView):
         self.use_shade = self._config.get('preferences.relation-shade')
         self.theme = self._config.get('preferences.relation-display-theme')
         self.toolbar_visible = config.get('interface.toolbar-on')
+
+    def get_handle_from_gramps_id(self, gid):
+        """
+        returns the handle of the specified object
+        """
+        obj = self.dbstate.db.get_person_from_gramps_id(gid)
+        if obj:
+            return obj.get_handle()
+        else:
+            return None
 
     def _connect_db_signals(self):
         """
@@ -306,15 +317,6 @@ class RelationshipView(NavigationView):
         self.child = None
 
         self.scroll = Gtk.ScrolledWindow()
-
-        st_cont = self.scroll.get_style_context()
-        col = st_cont.lookup_color('base_color')
-        if col[0]:
-            self.color = col[1]
-        else:
-            self.color = Gdk.RGBA()
-            self.color.parse("White")
-
         self.scroll.set_policy(Gtk.PolicyType.AUTOMATIC,
                                Gtk.PolicyType.AUTOMATIC)
         self.scroll.show()
@@ -355,6 +357,7 @@ class RelationshipView(NavigationView):
               <menuitem action="ShareFamilyMenu"/>
               <menuitem action="AddSpouseMenu"/>
               <menuitem action="ChangeOrder"/>
+              <menuitem action="SetActive"/>
               <menuitem action="FilterEdit"/>
             </menu>
             <menu action="BookMenu">
@@ -525,7 +528,7 @@ class RelationshipView(NavigationView):
                 if family_handle:
                     self.write_parents(family_handle, person)
         else:
-            self.write_label("%s:" % _('Parents'), None, True, person)
+            self.write_label(_("%s:") % _('Parents'), None, True, person)
             self.row += 1
 
         family_handle_list = person.get_family_handle_list()
@@ -578,9 +581,7 @@ class RelationshipView(NavigationView):
 
         grid.attach(eventbox, 0, 0, 2, 1)
 
-        eventbox = Gtk.EventBox()
-        if self.use_shade:
-            eventbox.override_background_color(Gtk.StateType.NORMAL, self.color)
+        eventbox = widgets.ShadeBox(self.use_shade)
         grid.attach(eventbox, 1, 1, 1, 1)
         subgrid = Gtk.Grid()
         subgrid.set_column_spacing(12)
@@ -589,7 +590,7 @@ class RelationshipView(NavigationView):
         self._set_draggable_person(eventbox, person.get_handle())
         # Gramps ID
 
-        subgrid.attach(widgets.BasicLabel("%s:" % _('ID')), 1, 0, 1, 1)
+        subgrid.attach(widgets.BasicLabel(_("%s:") % _('ID')), 1, 0, 1, 1)
         label = widgets.BasicLabel(person.gramps_id)
         label.set_hexpand(True)
         subgrid.attach(label, 2, 0, 1, 1)
@@ -601,7 +602,7 @@ class RelationshipView(NavigationView):
         else:
             birth_title = _("Birth")
 
-        subgrid.attach(widgets.BasicLabel("%s:" % birth_title), 1, 1, 1, 1)
+        subgrid.attach(widgets.BasicLabel(_("%s:") % birth_title), 1, 1, 1, 1)
         subgrid.attach(widgets.BasicLabel(self.format_event(birth)), 2, 1, 1, 1)
 
         death = get_death_or_fallback(self.dbstate.db, person)
@@ -618,7 +619,7 @@ class RelationshipView(NavigationView):
                     death_date = death.get_date_object()
                     if (death_date and death_date.get_valid()):
                         age = death_date - birth_date
-                        subgrid.attach(widgets.BasicLabel("%s:" % death_title),
+                        subgrid.attach(widgets.BasicLabel(_("%s:") % death_title),
                                       1, 2, 1, 1)
                         subgrid.attach(widgets.BasicLabel("%s (%s)" %
                                                          (self.format_event(death), age),
@@ -628,12 +629,12 @@ class RelationshipView(NavigationView):
                 if not showed_death:
                     age = Today() - birth_date
                     if probably_alive(person, self.dbstate.db):
-                        subgrid.attach(widgets.BasicLabel("%s:" % _("Alive")),
+                        subgrid.attach(widgets.BasicLabel(_("%s:") % _("Alive")),
                                       1, 2, 1, 1)
                         subgrid.attach(widgets.BasicLabel("(%s)" % age, Pango.EllipsizeMode.END),
                                       2, 2, 1, 1)
                     else:
-                        subgrid.attach(widgets.BasicLabel("%s:" % _("Death")),
+                        subgrid.attach(widgets.BasicLabel(_("%s:") % _("Death")),
                                       1, 2, 1, 1)
                         subgrid.attach(widgets.BasicLabel("%s (%s)" % (_("unknown"), age),
                                                          Pango.EllipsizeMode.END),
@@ -641,7 +642,7 @@ class RelationshipView(NavigationView):
                     showed_death = True
 
         if not showed_death:
-            subgrid.attach(widgets.BasicLabel("%s:" % death_title),
+            subgrid.attach(widgets.BasicLabel(_("%s:") % death_title),
                           1, 2, 1, 1)
             subgrid.attach(widgets.BasicLabel(self.format_event(death)),
                           2, 2, 1, 1)
@@ -804,8 +805,8 @@ class RelationshipView(NavigationView):
                 call_fcn = self.add_family
                 del_fcn = self.delete_family
 
-            if not self.toolbar_visible and not self.dbstate.db.readonly:
-                # Show edit-Buttons if toolbar is not visible
+            if not self.dbstate.db.readonly:
+                # Show edit-Buttons only if db is not readonly
                 if self.reorder_sensitive:
                     add = widgets.IconButton(self.reorder_button_press, None,
                                              'view-sort-ascending')
@@ -849,7 +850,7 @@ class RelationshipView(NavigationView):
             return
         if person and self.check_collapsed(person.handle, family_handle):
             # don't show rest
-            self.write_label("%s:" % _('Parents'), family, True, person)
+            self.write_label(_("%s:") % _('Parents'), family, True, person)
             self.row -= 1 # back up one row for summary names
             active = self.get_active()
             child_list = [ref.ref for ref in family.get_child_ref_list()
@@ -877,15 +878,13 @@ class RelationshipView(NavigationView):
             box = self.get_people_box(family.get_father_handle(),
                                       family.get_mother_handle(),
                                       post_msg=childmsg)
-            eventbox = Gtk.EventBox()
-            if self.use_shade:
-                eventbox.override_background_color(Gtk.StateType.NORMAL, self.color)
+            eventbox = widgets.ShadeBox(self.use_shade)
             eventbox.add(box)
             self.child.attach(eventbox, _PDATA_START, self.row,
                                _PDATA_STOP-_PDATA_START, 1)
             self.row += 1 # now advance it
         else:
-            self.write_label("%s:" % _('Parents'), family, True, person)
+            self.write_label(_("%s:") % _('Parents'), family, True, person)
             self.write_person(_('Father'), family.get_father_handle())
             self.write_person(_('Mother'), family.get_mother_handle())
 
@@ -931,9 +930,7 @@ class RelationshipView(NavigationView):
                     else :
                         childmsg = _(" (only child)")
                     box = self.get_people_box(post_msg=childmsg)
-                    eventbox = Gtk.EventBox()
-                    if self.use_shade:
-                        eventbox.override_background_color(Gtk.StateType.NORMAL, self.color)
+                    eventbox = widgets.ShadeBox(self.use_shade)
                     eventbox.add(box)
                     self.child.attach(eventbox, _PDATA_START, self.row,
                                       _PDATA_STOP-_PDATA_START, 1)
@@ -961,9 +958,7 @@ class RelationshipView(NavigationView):
                         child_should_be_linked = (child_handle != active)
                         self.write_child(vbox, child_handle, i, child_should_be_linked)
                         i += 1
-                    eventbox = Gtk.EventBox()
-                    if self.use_shade:
-                        eventbox.override_background_color(Gtk.StateType.NORMAL, self.color)
+                    eventbox = widgets.ShadeBox(self.use_shade)
                     eventbox.add(vbox)
                     self.child.attach(eventbox, _CDATA_START-1, self.row,
                                       _CDATA_STOP-_CDATA_START+1, 1)
@@ -983,9 +978,6 @@ class RelationshipView(NavigationView):
                 name = self.get_name(handle, True)
                 link_label = widgets.LinkLabel(name, self._button_press,
                                                handle, theme=self.theme)
-                if self.use_shade:
-                    link_label.override_background_color(Gtk.StateType.NORMAL,
-                                                         self.color)
                 if self._config.get('preferences.releditbtn'):
                     button = widgets.IconButton(self.edit_button_press,
                                                 handle)
@@ -1028,7 +1020,7 @@ class RelationshipView(NavigationView):
                           _PLABEL_STOP-_PLABEL_START, 1)
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        eventbox = Gtk.EventBox()
+        eventbox = widgets.ShadeBox(self.use_shade)
         if handle:
             name = self.get_name(handle, True)
             person = self.dbstate.db.get_person_from_handle(handle)
@@ -1042,8 +1034,6 @@ class RelationshipView(NavigationView):
                 emph = False
             link_label = widgets.LinkLabel(name, self._button_press,
                                            handle, emph, theme=self.theme)
-            if self.use_shade:
-                link_label.override_background_color(Gtk.StateType.NORMAL, self.color)
             if self._config.get('preferences.releditbtn'):
                 button = widgets.IconButton(self.edit_button_press, handle)
                 button.set_tooltip_text(_('Edit Person (%s)') % name[0])
@@ -1062,8 +1052,6 @@ class RelationshipView(NavigationView):
             if value:
                 vbox.pack_start(widgets.MarkupLabel(value), True, True, 0)
 
-        if self.use_shade:
-            eventbox.override_background_color(Gtk.StateType.NORMAL, self.color)
         eventbox.add(vbox)
 
         self.child.attach(eventbox, _PDATA_START, self.row,
@@ -1163,9 +1151,6 @@ class RelationshipView(NavigationView):
         name = self.get_name(handle, True)
         link_label = widgets.LinkLabel(name, link_func, handle, emph,
                                        theme=self.theme)
-
-        if self.use_shade:
-            link_label.override_background_color(Gtk.StateType.NORMAL, self.color)
         link_label.set_padding(3, 0)
         if child_should_be_linked and self._config.get(
             'preferences.releditbtn'):
@@ -1365,7 +1350,7 @@ class RelationshipView(NavigationView):
         # collapse button
         if self.check_collapsed(person.handle, family_handle):
             # show "> Family: ..." and nothing else
-            self.write_label("%s:" % _('Family'), family, False, person)
+            self.write_label(_("%s:") % _('Family'), family, False, person)
             self.row -= 1 # back up
             child_list = family.get_child_ref_list()
             if child_list:
@@ -1380,16 +1365,14 @@ class RelationshipView(NavigationView):
             else :
                 childmsg = _(" (no children)")
             box = self.get_people_box(handle, post_msg=childmsg)
-            eventbox = Gtk.EventBox()
-            if self.use_shade:
-                eventbox.override_background_color(Gtk.StateType.NORMAL, self.color)
+            eventbox = widgets.ShadeBox(self.use_shade)
             eventbox.add(box)
             self.child.attach(eventbox, _PDATA_START, self.row,
                               _PDATA_STOP-_PDATA_START, 1)
             self.row += 1 # now advance it
         else:
             # show "V Family: ..." and the rest
-            self.write_label("%s:" % _('Family'), family, False, person)
+            self.write_label(_("%s:") % _('Family'), family, False, person)
             if (handle or
                     family.get_relationship() != FamilyRelType.UNKNOWN):
                 box = self.write_person(_('Spouse'), handle)
@@ -1427,9 +1410,7 @@ class RelationshipView(NavigationView):
                 else :
                     childmsg = _(" (no children)")
                 box = self.get_people_box(post_msg=childmsg)
-                eventbox = Gtk.EventBox()
-                if self.use_shade:
-                    eventbox.override_background_color(Gtk.StateType.NORMAL, self.color)
+                eventbox = widgets.ShadeBox(self.use_shade)
                 eventbox.add(box)
                 self.child.attach(eventbox, _PDATA_START, self.row,
                                   _PDATA_STOP-_PDATA_START, 1)
@@ -1457,9 +1438,7 @@ class RelationshipView(NavigationView):
                     i += 1
 
                 self.row += 1
-                eventbox = Gtk.EventBox()
-                if self.use_shade:
-                    eventbox.override_background_color(Gtk.StateType.NORMAL, self.color)
+                eventbox = widgets.ShadeBox(self.use_shade)
                 eventbox.add(vbox)
                 self.child.attach(eventbox, _CDATA_START-1, self.row,
                                   _CDATA_STOP-_CDATA_START+1, 1)
@@ -1531,10 +1510,11 @@ class RelationshipView(NavigationView):
             name.add_surname(Surname())
             name.set_primary_surname(0)
             family = self.dbstate.db.get_family_from_handle(handle)
-            father = self.dbstate.db.get_person_from_handle(
-                                        family.get_father_handle())
-            if father:
-                preset_name(father, name)
+            father_h = family.get_father_handle()
+            if father_h:
+                father = self.dbstate.db.get_person_from_handle(father_h)
+                if father:
+                    preset_name(father, name)
             person.set_primary_name(name)
             try:
                 EditPerson(self.dbstate, self.uistate, [], person,

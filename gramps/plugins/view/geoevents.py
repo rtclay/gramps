@@ -187,6 +187,8 @@ class GeoEvents(GeoGraphyView):
         all handling of visibility is now in rebuild_trees, see that for more
         information.
         """
+        if not self.dbstate.is_open():
+            return
         active = self.uistate.get_active('Event')
         if active:
             self._createmap(active)
@@ -299,7 +301,8 @@ class GeoEvents(GeoGraphyView):
                 progress.step()
             progress.close()
         elif self.generic_filter:
-            events_list = self.generic_filter.apply(dbstate.db)
+            user=self.uistate.viewmanager.user
+            events_list = self.generic_filter.apply(dbstate.db, user=user)
             progress = ProgressMeter(self.window_name,
                                      can_cancel=False,
                                      parent=self.uistate.window)

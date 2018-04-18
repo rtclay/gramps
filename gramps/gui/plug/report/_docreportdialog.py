@@ -63,7 +63,7 @@ class DocReportDialog(ReportDialog):
     dialogs for docgen derived reports.
     """
 
-    def __init__(self, dbstate, uistate, option_class, name, trans_name):
+    def __init__(self, dbstate, uistate, option_class, name, trans_name, track=[]):
         """Initialize a dialog to request that the user select options
         for a basic *stand-alone* report."""
 
@@ -72,7 +72,7 @@ class DocReportDialog(ReportDialog):
         self.css = PLUGMAN.process_plugin_data('WEBSTUFF')
         self.dbname = dbstate.db.get_dbname()
         ReportDialog.__init__(self, dbstate, uistate, option_class,
-                              name, trans_name)
+                              name, trans_name, track=track)
 
         self.basedocname = None # keep pylint happy
         self.css_filename = None
@@ -108,9 +108,11 @@ class DocReportDialog(ReportDialog):
 
         if self.doc_options:
             self.doc = self.format(self.selected_style, pstyle,
-                                   self.doc_options)
+                                   self.doc_options,
+                                   uistate=self.uistate)
         else:
-            self.doc = self.format(self.selected_style, pstyle)
+            self.doc = self.format(self.selected_style, pstyle,
+                                   uistate=self.uistate)
         if not self.format_menu.get_active_plugin().get_paper_used():
             #set css filename
             self.doc.set_css_filename(self.css_filename)
