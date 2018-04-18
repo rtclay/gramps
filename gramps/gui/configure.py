@@ -1910,6 +1910,7 @@ class GrampsPreferences(ConfigureDialog):
             my_characters += v[2] + ":\t" + lang.get_sample_string() + "\n"
 
         scrollw = Gtk.ScrolledWindow()
+        scrollw.set_size_request(600, 100)
         text = Gtk.Label()
         text.set_line_wrap(True)
         font_description = Pango.font_description_from_string(font)

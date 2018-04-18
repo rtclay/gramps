@@ -255,7 +255,7 @@ WIKI_HELP_PAGE_MAN = '%s' % URL_MANUAL_PAGE
 
 CSS_FONT = """
 * {
-    font: %s;
+    font-family: %s;
   }
 """
 #-------------------------------------------------------------------------
@@ -403,9 +403,6 @@ class ViewManager(CLIManager):
         self.window.move(horiz_position, vert_position)
 
         self.provider = Gtk.CssProvider()
-        Gtk.StyleContext.add_provider_for_screen(
-                         self.window.get_screen(), self.provider,
-                         Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.change_font(font)
 
         #Set the mnemonic modifier on Macs to alt-ctrl so that it
@@ -937,9 +934,18 @@ class ViewManager(CLIManager):
         Change the default application font.
         Only in the case we use symbols.
         """
-        if config.get('utf8.in-use'):
+        if config.get('utf8.in-use') and font != "":
             css_font = CSS_FONT % font
-            self.provider.load_from_data(css_font.encode('UTF-8'))
+            try:
+                self.provider.load_from_data(css_font.encode('UTF-8'))
+                Gtk.StyleContext.add_provider_for_screen(
+                                 self.window.get_screen(), self.provider,
+                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            except:
+                # Force gramps to use the standard font.
+                print("I can't set the new font :", font)
+                config.set('utf8.in-use', False)
+                config.set('utf8.selected-font', "")
 
     def tip_of_day_activate(self, obj):
         """
