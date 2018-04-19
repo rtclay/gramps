@@ -62,12 +62,12 @@ class Symbols(object):
                (_("Female"),              '\u2640',     ""),
                (_("Lesbianism"),          '\u26a2',     ""),
                (_("Male homosexuality"),  '\u26a3',     ""),
-               (_("Heterosexality"),      '\u26a4',     ""),
+               (_("Heterosexuality"),     '\u26a4',     ""),
                (_("Transgender, hermaphrodite (in entomology)"), '\u26a5', ""),
                (_("Transgender"),         '\u26a6',     ""),
                (_("Asexuality, sexless, genderless"), '\u26aa', ""),
                (_("Neuter"),              '\u26b2',     ""),
-               (_("Illegitim"),           '\u229b',     ""),
+               (_("Illegitimate"),        '\u229b',     ""),
                (_("Birth"),               '\u002a',     "*"),
                (_("Baptism/Christening"), '\u007e',     "~"),
                (_("Engaged"),             '\u26ac',     "o"),
@@ -108,16 +108,16 @@ class Symbols(object):
                      (_("Ankh"),                       "\u2625",  "+"),
                      (_("Orthodox cross"),             "\u2626",  "+"),
                      (_("Chi rho"),                    "\u2627",  "+"),
-                     (_("Cross of lorraine"),          "\u2628",  "+"),
-                     (_("Cross of jerusalem"),         "\u2629",  "+"),
+                     (_("Cross of Lorraine"),          "\u2628",  "+"),
+                     (_("Cross of Jerusalem"),         "\u2629",  "+"),
                      (_("Star and crescent"),          "\u262a",  "+"),
-                     (_("West syriac cross"),          "\u2670",  "+"),
-                     (_("East syriac cross"),          "\u2671",  "+"),
-                     (_("Heavy greek cross"),          "\u271a",  "+"),
+                     (_("West Syriac cross"),          "\u2670",  "+"),
+                     (_("East Syriac cross"),          "\u2671",  "+"),
+                     (_("Heavy Greek cross"),          "\u271a",  "+"),
                      (_("Latin cross"),                "\u271d",  "+"),
                      (_("Shadowed White Latin cross"), "\u271e",  "+"),
                      (_("Maltese cross"),              "\u2720",  "+"),
-                     (_("Star of david"),              "\u2721",  "+"),
+                     (_("Star of David"),              "\u2721",  "+"),
                      (_("Dead"),                       _("Dead"), _("Dead"))
                 ]
 
@@ -127,7 +127,7 @@ class Symbols(object):
     # functions for general symbols
     #
     def get_symbol_for_html(self, symbol):
-        """ retun the html string like '&#9898;' """
+        """ return the html string like '&#9898;' """
         return '&#%d;' % ord(self.all_symbols[symbol][1])
 
     def get_symbol_name(self, symbol):
