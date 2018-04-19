@@ -929,6 +929,14 @@ class ViewManager(CLIManager):
         except WindowActiveError:
             return
 
+    def reset_font(self):
+        """
+        Reset to the default application font.
+        """
+        self.provider.get_default()
+        Gtk.StyleContext.remove_provider_for_screen(self.window.get_screen(),
+                                                    self.provider)
+
     def change_font(self, font):
         """
         Change the default application font.
@@ -941,11 +949,13 @@ class ViewManager(CLIManager):
                 Gtk.StyleContext.add_provider_for_screen(
                                  self.window.get_screen(), self.provider,
                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                return True
             except:
                 # Force gramps to use the standard font.
                 print("I can't set the new font :", font)
                 config.set('utf8.in-use', False)
                 config.set('utf8.selected-font', "")
+        return False
 
     def tip_of_day_activate(self, obj):
         """

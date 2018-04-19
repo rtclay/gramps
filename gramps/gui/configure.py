@@ -1860,7 +1860,7 @@ class GrampsPreferences(ConfigureDialog):
             if len(font_usage) == nb_symbols: # If the font use all symbols
                 available_fonts.append(font)
                 nb1 += 1
-        config.set('utf8.available-fonts',available_fonts)
+        config.set('utf8.available-fonts', available_fonts)
         sel_font = config.get('utf8.selected-font')
         active_val = 0
         for val in available_fonts:
@@ -1872,7 +1872,8 @@ class GrampsPreferences(ConfigureDialog):
             self.add_combo(self.grid,
                 _('Choose font'),
                 5, 'utf8.selected-font',
-                self.all_avail_fonts, callback=self.utf8_update_font, valueactive=True, setactive=active_val)
+                self.all_avail_fonts, callback=self.utf8_update_font,
+                valueactive=True, setactive=active_val)
         else:
             self.add_text(self.grid,
                 _('You have no font with genealogical symbols on your '
@@ -1889,13 +1890,21 @@ class GrampsPreferences(ConfigureDialog):
         self.utf8_show_example()
 
     def activate_change_font(self, obj=None):
+        if obj:
+            if not obj.get_active():
+                # reset to the system default
+                self.uistate.viewmanager.reset_font()
         font = config.get('utf8.selected-font')
-        self.uistate.viewmanager.change_font(font)
+        if not self.uistate.viewmanager.change_font(font):
+            # We can't change the font, so reset the checkbox.
+            if obj:
+                obj.set_active(False)
 
     def utf8_show_example(self):
         from gi.repository import Pango
         from gramps.gen.utils.grampslocale import _LOCALE_NAMES as X
         try:
+            # remove the old messages with old font
             self.grid.remove_row(8)
             self.grid.remove_row(7)
         except:
