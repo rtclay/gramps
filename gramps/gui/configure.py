@@ -1782,15 +1782,9 @@ class GrampsPreferences(ConfigureDialog):
             all_sbls = symbols.get_death_symbols()
             all_symbols = []
             for symbol in all_sbls:
-                all_symbols.append(symbol[2] + " " + symbol[0])
+                all_symbols.append(symbol[1] + " " + symbol[0])
             self.all_death_symbols = [x for x in enumerate(all_symbols)]
-            val = config.get('utf8.death-symbol')
-            active_val = symbols.get_death_symbol_for_string(val) + " " + symbols.get_death_symbol_name(val)
-            pos = 0
-            for nr, item in enumerate(self.all_death_symbols):
-                if item[-1] == active_val:
-                    pos = nr
-                    break
+            pos = config.get('utf8.death-symbol')
             combo = self.add_combo(self.grid,
                 _('Select default death symbol'),
                 6, 'utf8.death-symbol',
@@ -1838,8 +1832,7 @@ class GrampsPreferences(ConfigureDialog):
                         all_fonts[fontname].append(value)
                 self.progress.step()
             for rand in range(symbols.DEATH_SYMBOL_SKULL, symbols.DEATH_SYMBOL_DEAD):
-                string = symbols.get_death_symbol_for_html(rand)
-                value = symbols.get_death_symbol_for_string(string)
+                value = symbols.get_death_symbol_for_char(rand)
                 font = fonts[idx]
                 fontname = font.family[0][1]
                 try:
@@ -1903,6 +1896,7 @@ class GrampsPreferences(ConfigureDialog):
     def utf8_show_example(self):
         from gi.repository import Pango
         from gramps.gen.utils.grampslocale import _LOCALE_NAMES as X
+        from string import ascii_letters
         try:
             # remove the old messages with old font
             self.grid.remove_row(8)
@@ -1912,8 +1906,8 @@ class GrampsPreferences(ConfigureDialog):
         font = config.get('utf8.selected-font')
         symbols = Symbols()
         my_characters = _("What you will see") + " :\n"
-        my_characters += "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz "
-        my_characters += "àäâçùéèiïîêëiÉÀÈïÏËÄœŒÅåØøìòô ...\n"
+        my_characters += ascii_letters
+        my_characters += " àäâçùéèiïîêëiÉÀÈïÏËÄœŒÅåØøìòô ...\n"
         for k,v in sorted(X.items()):
             lang = Pango.Language.from_string(k)
             my_characters += v[2] + ":\t" + lang.get_sample_string() + "\n"
@@ -1931,27 +1925,11 @@ class GrampsPreferences(ConfigureDialog):
         scrollw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         self.grid.attach(scrollw, 1, 7, 8, 1)
 
-        my_characters = symbols.get_symbol_for_string(Symbols.SYMBOL_MALE) + " "
-        my_characters = symbols.get_symbol_for_string(Symbols.SYMBOL_FEMALE) + " "
-        my_characters = symbols.get_symbol_for_string(Symbols.SYMBOL_LESBIAN) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_MALE_HOMOSEXUAL) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_HETEROSEXUAL) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_HERMAPHRODITE) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_TRANSGENDER) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_ASEXUAL_SEXLESS) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_NEUTER) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_ILLEGITIM) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_BIRTH) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_BAPTISATION) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_ENGAGED) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_MARRIAGE) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_DIVORCE) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_UNMARRIED_PARTNERSHIP) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_BURIED) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_CREMATED) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_KILLED_IN_ACTION) + " "
-        my_characters += symbols.get_symbol_for_string(Symbols.SYMBOL_EXTINCT) + " "
-        my_characters += symbols.get_death_symbol_for_string(config.get('utf8.death-symbol')) + " "
+        my_characters = ""
+        for idx in range(symbols.SYMBOL_MALE, symbols.SYMBOL_EXTINCT+1):
+            my_characters += symbols.get_symbol_for_string(idx) + " "
+
+        my_characters += symbols.get_death_symbol_for_char(config.get('utf8.death-symbol'))
         text = Gtk.Label()
         text.set_line_wrap(True)
         font_description = Pango.font_description_from_string(font)
@@ -1967,8 +1945,6 @@ class GrampsPreferences(ConfigureDialog):
 
     def utf8_update_death_symbol(self, obj, constant):
         entry = obj.get_active()
-        symbols = Symbols()
-        all_sbls = symbols.get_death_symbols()
-        config.set(constant, all_sbls[entry][1])
+        config.set(constant, entry)
         self.utf8_show_example()
 

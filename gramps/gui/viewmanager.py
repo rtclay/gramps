@@ -933,7 +933,7 @@ class ViewManager(CLIManager):
         """
         Reset to the default application font.
         """
-        self.provider.get_default()
+        #self.provider.get_default()
         Gtk.StyleContext.remove_provider_for_screen(self.window.get_screen(),
                                                     self.provider)
 

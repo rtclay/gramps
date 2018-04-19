@@ -308,7 +308,7 @@ register('plugin.addonplugins', [])
 register('utf8.in-use', False)
 register('utf8.available-fonts', [])
 register('utf8.selected-font', "")
-register('utf8.death-symbol', "")
+register('utf8.death-symbol', 13)
 
 if __debug__: # enable a simple CLI test to see if the datestrings exist
     register('test.january', _("localized lexeme inflections||January"))
