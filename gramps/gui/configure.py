@@ -1755,25 +1755,25 @@ class GrampsPreferences(ConfigureDialog):
                    )
         self.add_text(self.grid, message,
                 2, line_wrap=True)
+        available_fonts = config.get('utf8.available-fonts')
+        self.all_avail_fonts = list(enumerate(available_fonts))
+        if len(available_fonts) > 0:
+            self.add_text(self.grid,
+                _('You have already run the tool to search for genealogy fonts.'
+                  '\nRun it again only if you added fonts on your system.'
+                 ),
+                3, line_wrap=True)
         self.add_button(self.grid,
                 _('Try to find'),
-                3,
+                4,
                 'utf8.in-use',
                 extra_callback=self.can_we_use_genealogical_fonts)
         sel_font = config.get('utf8.selected-font')
-        available_fonts = config.get('utf8.available-fonts')
-        active_val = 0
-        self.all_avail_fonts = [x for x in enumerate(available_fonts)]
         if len(available_fonts) > 0:
-            self.add_text(self.grid,
-                _('You already run the tools to search genealogy fonts.'
-                  '\nRun it again only if you added fonts on your system.'
-                 ),
-                4, line_wrap=True)
-            for val in available_fonts:
-                if sel_font == val:
-                    break
-                active_val += 1
+            try:
+                active_val = available_fonts.index(sel_font)
+            except:
+                active_val = 0
             self.add_combo(self.grid,
                 _('Choose font'),
                 5, 'utf8.selected-font',
@@ -1783,7 +1783,7 @@ class GrampsPreferences(ConfigureDialog):
             all_symbols = []
             for symbol in all_sbls:
                 all_symbols.append(symbol[1] + " " + symbol[0])
-            self.all_death_symbols = [x for x in enumerate(all_symbols)]
+            self.all_death_symbols = list(enumerate(all_symbols))
             pos = config.get('utf8.death-symbol')
             combo = self.add_combo(self.grid,
                 _('Select default death symbol'),
@@ -1799,6 +1799,7 @@ class GrampsPreferences(ConfigureDialog):
         try:
             import fontconfig
             from gramps.gui.utils import ProgressMeter
+            from collections import defaultdict
         except:
             from gramps.gui.dialog import WarningDialog
             WarningDialog(_("Cannot look for genealogical fonts"),
@@ -1817,7 +1818,7 @@ class GrampsPreferences(ConfigureDialog):
         self.progress.set_pass(_('Looking for all fonts with genealogical symbols.'), nb_symbols*len(fonts))
         for idx in range(0, len(fonts)):
             if not self.in_progress:
-                return
+                return # We clicked on Cancel
             for rand in range(symbols.SYMBOL_MALE, symbols.SYMBOL_EXTINCT+1):
                 string = symbols.get_symbol_for_html(rand)
                 value = symbols.get_symbol_for_string(rand)
@@ -1844,24 +1845,20 @@ class GrampsPreferences(ConfigureDialog):
                         all_fonts[fontname].append(value)
                 self.progress.step()
         self.progress.close()
-        nb1 = 0
         available_fonts = []
-        for font in all_fonts.keys():
-            font_usage = all_fonts[font]
+        for font, font_usage in all_fonts.items():
             if not font_usage:
                continue
             if len(font_usage) == nb_symbols: # If the font use all symbols
                 available_fonts.append(font)
-                nb1 += 1
         config.set('utf8.available-fonts', available_fonts)
         sel_font = config.get('utf8.selected-font')
-        active_val = 0
-        for val in available_fonts:
-            if sel_font == val:
-                break
-            active_val += 1
+        try:
+            active_val = available_fonts.index(sel_font)
+        except:
+            active_val = 0
         if len(available_fonts) > 0:
-            self.all_avail_fonts = [x for x in enumerate(available_fonts)]
+            self.all_avail_fonts = list(enumerate(available_fonts))
             self.add_combo(self.grid,
                 _('Choose font'),
                 5, 'utf8.selected-font',

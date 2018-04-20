@@ -37,13 +37,14 @@ class Symbols(object):
     # genealogical symbols
     SYMBOL_MALE                      = 0
     SYMBOL_FEMALE                    = 1
-    SYMBOL_LESBIAN                   = 2
-    SYMBOL_MALE_HOMOSEXUAL           = 3
-    SYMBOL_HETEROSEXUAL              = 4
-    SYMBOL_HERMAPHRODITE             = 5
-    SYMBOL_TRANSGENDER               = 6
-    SYMBOL_ASEXUAL_SEXLESS           = 7
+    SYMBOL_ASEXUAL_SEXLESS           = 2 # Unknown
+    SYMBOL_LESBIAN                   = 3
+    SYMBOL_MALE_HOMOSEXUAL           = 4
+    SYMBOL_HETEROSEXUAL              = 5
+    SYMBOL_HERMAPHRODITE             = 6
+    SYMBOL_TRANSGENDER               = 7
     SYMBOL_NEUTER                    = 8
+
     SYMBOL_ILLEGITIM                 = 9
     SYMBOL_BIRTH                     = 10
     SYMBOL_BAPTISM                   = 11 # CHRISTENING
@@ -60,13 +61,14 @@ class Symbols(object):
                # Name                     UNICODE       SUBSTITUTION
                (_("Male"),                '\u2642',     ""),
                (_("Female"),              '\u2640',     ""),
+               (_("Asexuality, sexless, genderless"), '\u26aa', ""),
                (_("Lesbianism"),          '\u26a2',     ""),
                (_("Male homosexuality"),  '\u26a3',     ""),
                (_("Heterosexuality"),     '\u26a4',     ""),
                (_("Transgender, hermaphrodite (in entomology)"), '\u26a5', ""),
                (_("Transgender"),         '\u26a6',     ""),
-               (_("Asexuality, sexless, genderless"), '\u26aa', ""),
                (_("Neuter"),              '\u26b2',     ""),
+
                (_("Illegitimate"),        '\u229b',     ""),
                (_("Birth"),               '\u002a',     "*"),
                (_("Baptism/Christening"), '\u007e',     "~"),
@@ -137,7 +139,7 @@ class Symbols(object):
         return self.all_symbols[symbol][0]
 
     def get_symbol_for_string(self, symbol):
-        """ retun the utf-8 character like '\u2670' """
+        """ return the utf-8 character like '\u2670' """
         return self.all_symbols[symbol][1]
 
     def get_symbol_fallback(self, symbol):
