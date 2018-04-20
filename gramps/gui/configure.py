@@ -1777,7 +1777,9 @@ class GrampsPreferences(ConfigureDialog):
             self.add_combo(self.grid,
                 _('Choose font'),
                 5, 'utf8.selected-font',
-                self.all_avail_fonts, callback=self.utf8_update_font, valueactive=True, setactive=active_val)
+                self.all_avail_fonts,
+                callback=self.utf8_update_font,
+                valueactive=True, setactive=active_val)
             symbols = Symbols()
             all_sbls = symbols.get_death_symbols()
             all_symbols = []
@@ -1788,7 +1790,9 @@ class GrampsPreferences(ConfigureDialog):
             combo = self.add_combo(self.grid,
                 _('Select default death symbol'),
                 6, 'utf8.death-symbol',
-                self.all_death_symbols, callback=self.utf8_update_death_symbol, valueactive=True, setactive='')
+                self.all_death_symbols,
+                callback=self.utf8_update_death_symbol,
+                valueactive=True, setactive='')
             combo.set_active(pos)
             if config.get('utf8.selected-font') != "":
                 self.utf8_show_example()
@@ -1808,41 +1812,41 @@ class GrampsPreferences(ConfigureDialog):
                           parent=self.uistate.window)
             return False
         fonts = fontconfig.query()
-        all_fonts = {}
+        all_fonts = defaultdict(set)
         symbols = Symbols()
         nb_symbols = symbols.get_how_many_symbols()
         self.in_progress = True
         self.progress = ProgressMeter(_('Checking available genealogical fonts'),
                                        can_cancel=True,
-                                       cancel_callback=self.stop_looking_for_font, parent=self.uistate.window)
+                                       cancel_callback=self.stop_looking_for_font,
+                                       parent=self.uistate.window)
         self.progress.set_pass(_('Looking for all fonts with genealogical symbols.'), nb_symbols*len(fonts))
-        for idx in range(0, len(fonts)):
+        for path in fonts:
             if not self.in_progress:
                 return # We clicked on Cancel
+            font = fontconfig.FcFont(path)
+            fontname = font.family[0][1]
             for rand in range(symbols.SYMBOL_MALE, symbols.SYMBOL_EXTINCT+1):
                 string = symbols.get_symbol_for_html(rand)
                 value = symbols.get_symbol_for_string(rand)
-                font = fonts[idx]
-                fontname = font.family[0][1]
                 try:
                     vals = all_fonts[fontname]
                 except:
                     all_fonts[fontname] = []
                 if font.has_char(value):
                     if value not in all_fonts[fontname]:
-                        all_fonts[fontname].append(value)
+                        all_fonts[fontname].add(value)
                 self.progress.step()
-            for rand in range(symbols.DEATH_SYMBOL_SKULL, symbols.DEATH_SYMBOL_DEAD):
+            for rand in range(symbols.DEATH_SYMBOL_SKULL,
+                              symbols.DEATH_SYMBOL_DEAD):
                 value = symbols.get_death_symbol_for_char(rand)
-                font = fonts[idx]
-                fontname = font.family[0][1]
                 try:
                     vals = all_fonts[fontname]
                 except:
                     all_fonts[fontname] = []
                 if font.has_char(value):
                     if value not in all_fonts[fontname]:
-                        all_fonts[fontname].append(value)
+                        all_fonts[fontname].add(value)
                 self.progress.step()
         self.progress.close()
         available_fonts = []
@@ -1864,6 +1868,20 @@ class GrampsPreferences(ConfigureDialog):
                 5, 'utf8.selected-font',
                 self.all_avail_fonts, callback=self.utf8_update_font,
                 valueactive=True, setactive=active_val)
+            symbols = Symbols()
+            all_sbls = symbols.get_death_symbols()
+            all_symbols = []
+            for symbol in all_sbls:
+                all_symbols.append(symbol[1] + " " + symbol[0])
+            self.all_death_symbols = list(enumerate(all_symbols))
+            pos = config.get('utf8.death-symbol')
+            combo = self.add_combo(self.grid,
+                _('Select default death symbol'),
+                6, 'utf8.death-symbol',
+                self.all_death_symbols,
+                callback=self.utf8_update_death_symbol,
+                valueactive=True, setactive='')
+            combo.set_active(pos)
         else:
             self.add_text(self.grid,
                 _('You have no font with genealogical symbols on your '
@@ -1926,7 +1944,8 @@ class GrampsPreferences(ConfigureDialog):
         for idx in range(symbols.SYMBOL_MALE, symbols.SYMBOL_EXTINCT+1):
             my_characters += symbols.get_symbol_for_string(idx) + " "
 
-        my_characters += symbols.get_death_symbol_for_char(config.get('utf8.death-symbol'))
+        death_symbl = config.get('utf8.death-symbol')
+        my_characters += symbols.get_death_symbol_for_char(death_symbl)
         text = Gtk.Label()
         text.set_line_wrap(True)
         font_description = Pango.font_description_from_string(font)
