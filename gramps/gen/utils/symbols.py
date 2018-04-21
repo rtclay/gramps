@@ -35,8 +35,8 @@ import fontconfig
 
 class Symbols(object):
     # genealogical symbols
-    SYMBOL_MALE                      = 0
-    SYMBOL_FEMALE                    = 1
+    SYMBOL_FEMALE                    = 0
+    SYMBOL_MALE                      = 1
     SYMBOL_ASEXUAL_SEXLESS           = 2 # Unknown
     SYMBOL_LESBIAN                   = 3
     SYMBOL_MALE_HOMOSEXUAL           = 4
@@ -59,8 +59,8 @@ class Symbols(object):
 
     all_symbols = [
                # Name                     UNICODE       SUBSTITUTION
-               (_("Male"),                '\u2642',     ""),
                (_("Female"),              '\u2640',     ""),
+               (_("Male"),                '\u2642',     ""),
                (_("Asexuality, sexless, genderless"), '\u26aa', ""),
                (_("Lesbianism"),          '\u26a2',     ""),
                (_("Male homosexuality"),  '\u26a3',     ""),

@@ -376,6 +376,7 @@ class DisplayState(Callback):
         'grampletbar-close-changed' : None,
         'update-available' : (list, ),
         'autobackup' : None,
+        'font-changed' : None,
         }
 
     #nav_type to message

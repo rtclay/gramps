@@ -1907,6 +1907,7 @@ class GrampsPreferences(ConfigureDialog):
             # We can't change the font, so reset the checkbox.
             if obj:
                 obj.set_active(False)
+        self.uistate.emit('font-changed')
 
     def utf8_show_example(self):
         from gi.repository import Pango
