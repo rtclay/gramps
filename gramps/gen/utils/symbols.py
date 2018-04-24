@@ -28,7 +28,6 @@
 #-------------------------------------------------------------------------
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 _ = glocale.translation.sgettext
-import fontconfig
 
 # pylint: disable=superfluous-parens
 # pylint: disable=anomalous-unicode-escape-in-string
