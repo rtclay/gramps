@@ -107,6 +107,11 @@ class FanChart2WayView(fanchart2way.FanChart2WayGrampsGUI, NavigationView):
         self.func_list.update({
             '<PRIMARY>J' : self.jump,
             })
+        self.uistate.connect('font-changed', self.font_changed)
+
+    def font_changed(self):
+        self.format_helper.reload_symbols()
+        self.update()
 
     def navigation_type(self):
         return 'Person'

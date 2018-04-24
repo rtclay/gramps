@@ -99,6 +99,11 @@ class FanChartView(fanchart.FanChartGrampsGUI, NavigationView):
         self.func_list.update({
             '<PRIMARY>J' : self.jump,
             })
+        self.uistate.connect('font-changed', self.font_changed)
+
+    def font_changed(self):
+        self.format_helper.reload_symbols()
+        self.update()
 
     def navigation_type(self):
         return 'Person'
@@ -183,6 +188,7 @@ class FanChartView(fanchart.FanChartGrampsGUI, NavigationView):
                          accel="<PRIMARY>P",
                          tip=_("Print or save the Fan Chart View"),
                          callback=self.printview)
+
     def build_tree(self):
         """
         Generic method called by PageView to construct the view.

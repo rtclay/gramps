@@ -1829,24 +1829,14 @@ class GrampsPreferences(ConfigureDialog):
             for rand in range(symbols.SYMBOL_MALE, symbols.SYMBOL_EXTINCT+1):
                 string = symbols.get_symbol_for_html(rand)
                 value = symbols.get_symbol_for_string(rand)
-                try:
-                    vals = all_fonts[fontname]
-                except:
-                    all_fonts[fontname] = []
                 if font.has_char(value):
-                    if value not in all_fonts[fontname]:
-                        all_fonts[fontname].add(value)
+                    all_fonts[fontname].add(value)
                 self.progress.step()
             for rand in range(symbols.DEATH_SYMBOL_SKULL,
                               symbols.DEATH_SYMBOL_DEAD):
                 value = symbols.get_death_symbol_for_char(rand)
-                try:
-                    vals = all_fonts[fontname]
-                except:
-                    all_fonts[fontname] = []
                 if font.has_char(value):
-                    if value not in all_fonts[fontname]:
-                        all_fonts[fontname].add(value)
+                    all_fonts[fontname].add(value)
                 self.progress.step()
         self.progress.close()
         available_fonts = []
@@ -1887,7 +1877,7 @@ class GrampsPreferences(ConfigureDialog):
                 _('You have no font with genealogical symbols on your '
                   'system. Gramps will not be able to use symbols.'
                  ),
-                4, line_wrap=True)
+                6, line_wrap=True)
             config.set('utf8.selected-font',"")
         self.grid.show_all()
         self.in_progress = False
@@ -1907,6 +1897,7 @@ class GrampsPreferences(ConfigureDialog):
             # We can't change the font, so reset the checkbox.
             if obj:
                 obj.set_active(False)
+        self.uistate.reload_symbols()
         self.uistate.emit('font-changed')
 
     def utf8_show_example(self):

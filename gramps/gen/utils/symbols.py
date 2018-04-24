@@ -187,4 +187,4 @@ class Symbols(object):
     # functions for all symbols
     #
     def get_how_many_symbols(self):
-        return len(self.death_symbols) + len(self.all_symbols) - 3
+        return len(self.death_symbols) + len(self.all_symbols) - 4
