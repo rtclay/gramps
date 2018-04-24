@@ -1811,6 +1811,14 @@ class GrampsPreferences(ConfigureDialog):
                             "Please, install the module fontconfig for python 3."),
                           parent=self.uistate.window)
             return False
+        try:
+            # remove the old messages with old font
+            self.grid.remove_row(8)
+            self.grid.remove_row(7)
+            self.grid.remove_row(6)
+            self.grid.remove_row(5)
+        except:
+            pass
         fonts = fontconfig.query()
         all_fonts = defaultdict(set)
         symbols = Symbols()
