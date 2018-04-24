@@ -62,20 +62,18 @@ class FormattingHelper:
 
     def reload_symbols(self):
         self.clear_cache()
+        death_idx = self.uistate.death_symbol
         if self.uistate and self.uistate.symbols:
             self.male = self.symbols.get_symbol_for_string(self.symbols.SYMBOL_MALE)
             self.female = self.symbols.get_symbol_for_string(self.symbols.SYMBOL_FEMALE)
             self.bth = self.symbols.get_symbol_for_string(self.symbols.SYMBOL_BIRTH)
             self.marr = self.symbols.get_symbol_for_string(self.symbols.SYMBOL_MARRIAGE)
-            death_idx = self.uistate.death_symbol
             self.dth = self.symbols.get_death_symbol_for_char(death_idx)
         else:
             self.male = self.symbols.get_symbol_fallback(self.symbols.SYMBOL_MALE)
             self.female = self.symbols.get_symbol_fallback(self.symbols.SYMBOL_FEMALE)
-            self.bth = self.symbols.get_symbol_fallback(self.symbols.SYMBOL_BIRTH)
             self.marr = self.symbols.get_symbol_fallback(self.symbols.SYMBOL_MARRIAGE)
-            #death_idx = self.uistate.death_symbol
-            self.dth = self.symbols.get_death_symbol_fallback(5)
+            self.dth = self.symbols.get_death_symbol_fallback(death_idx)
 
     def format_relation(self, family, line_count, use_markup=False):
         """ Format a relation between parents of a family
@@ -196,10 +194,10 @@ class FormattingHelper:
                 dplace = ""
 
             if line_count < 5:
-                text = "%s\n%c %s\n%c %s" % (name, self.bth, bdate,
+                text = "%s\n%s %s\n%s %s" % (name, self.bth, bdate,
                                              self.dth, ddate)
             else:
-                text = "%s\n%c %s\n  %s\n%c %s\n  %s" % (name, self.bth, bdate,
+                text = "%s\n%s %s\n  %s\n%s %s\n  %s" % (name, self.bth, bdate,
                                                          bplace, self.dth,
                                                          ddate, dplace)
         if use_markup:
