@@ -254,7 +254,7 @@ WIKI_HELP_PAGE_KEY = '%s_-_Keybindings' % URL_MANUAL_PAGE
 WIKI_HELP_PAGE_MAN = '%s' % URL_MANUAL_PAGE
 
 CSS_FONT = """
-* {
+#view {
     font-family: %s;
   }
 """
