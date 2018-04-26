@@ -1876,11 +1876,16 @@ class GrampsPreferences(ConfigureDialog):
             active_val = 0
         if len(available_fonts) > 0:
             self.all_avail_fonts = list(enumerate(available_fonts))
-            self.add_combo(self.grid,
+            choosefont = self.add_combo(self.grid,
                 _('Choose font'),
                 5, 'utf8.selected-font',
                 self.all_avail_fonts, callback=self.utf8_update_font,
                 valueactive=True, setactive=active_val)
+            if len(available_fonts) == 1:
+                single_font = self.all_avail_fonts[choosefont.get_active()][1]
+                config.set('utf8.selected-font',
+                           self.all_avail_fonts[single_font])
+                self.utf8_show_example()
             symbols = Symbols()
             all_sbls = symbols.get_death_symbols()
             all_symbols = []
@@ -1956,7 +1961,7 @@ class GrampsPreferences(ConfigureDialog):
         self.grid.attach(scrollw, 1, 7, 8, 1)
 
         my_characters = ""
-        for idx in range(symbols.SYMBOL_MALE, symbols.SYMBOL_EXTINCT+1):
+        for idx in range(symbols.SYMBOL_FEMALE, symbols.SYMBOL_EXTINCT+1):
             my_characters += symbols.get_symbol_for_string(idx) + " "
 
         death_symbl = config.get('utf8.death-symbol')
@@ -1966,7 +1971,9 @@ class GrampsPreferences(ConfigureDialog):
         font_description = Pango.font_description_from_string(font)
         text.modify_font(font_description)
         text.set_halign(Gtk.Align.START)
-        text.set_text(my_characters)
+        text.set_markup("<big><big><big><big>" +
+                        my_characters +
+                        "</big></big></big></big>")
         self.grid.attach(text, 1, 8, 8, 1)
         self.grid.show_all()
 
