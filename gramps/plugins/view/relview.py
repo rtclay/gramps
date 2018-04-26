@@ -80,12 +80,7 @@ from gramps.gen.const import CUSTOM_FILTERS
 from gramps.gen.utils.db import (get_birth_or_fallback, get_death_or_fallback,
                           preset_name)
 from gramps.gui.ddtargets import DdTargets
-
-_GenderCode = {
-    Person.MALE    : '\u2642',
-    Person.FEMALE  : '\u2640',
-    Person.UNKNOWN : '\u2650',
-    }
+from gramps.gen.utils.symbols import Symbols
 
 _NAME_START   = 0
 _LABEL_START  = 0
@@ -145,6 +140,7 @@ class RelationshipView(NavigationView):
         dbstate.connect('database-changed', self.change_db)
         uistate.connect('nameformat-changed', self.build_tree)
         uistate.connect('placeformat-changed', self.build_tree)
+        uistate.connect('font-changed', self.font_changed)
         self.redrawing = False
 
         self.child = None
@@ -160,6 +156,8 @@ class RelationshipView(NavigationView):
         self.use_shade = self._config.get('preferences.relation-shade')
         self.theme = self._config.get('preferences.relation-display-theme')
         self.toolbar_visible = config.get('interface.toolbar-on')
+        self.symbols = Symbols()
+        self.reload_symbols()
 
     def get_handle_from_gramps_id(self, gid):
         """
@@ -187,6 +185,31 @@ class RelationshipView(NavigationView):
         self.callman.add_db_signal('family-rebuild', self.family_rebuild)
 
         self.callman.add_db_signal('person-delete', self.redraw)
+
+    def reload_symbols(self):
+        if self.uistate and self.uistate.symbols:
+            gsfs = self.symbols.get_symbol_for_string
+            self.male = gsfs(self.symbols.SYMBOL_MALE)
+            self.female = gsfs(self.symbols.SYMBOL_FEMALE)
+            self.bth = gsfs(self.symbols.SYMBOL_BIRTH)
+            self.marr = gsfs(self.symbols.SYMBOL_MARRIAGE)
+            self.homom = gsfs(self.symbols.SYMBOL_MALE_HOMOSEXUAL)
+            self.homof = gsfs(self.symbols.SYMBOL_LESBIAN)
+            self.marr = gsfs(self.symbols.SYMBOL_MARRIAGE)
+            death_idx = self.uistate.death_symbol
+            self.dth = self.symbols.get_death_symbol_for_char(death_idx)
+        else:
+            gsf = self.symbols.get_symbol_fallback
+            self.male = gsf(self.symbols.SYMBOL_MALE)
+            self.female = gsf(self.symbols.SYMBOL_FEMALE)
+            self.bth = gsf(self.symbols.SYMBOL_BIRTH)
+            self.marr = gsf(self.symbols.SYMBOL_MARRIAGE)
+            death_idx = self.symbols.DEATH_SYMBOL_LATIN_CROSS
+            self.dth = self.symbols.get_death_symbol_fallback(death_idx)
+
+    def font_changed(self):
+        self.reload_symbols()
+        self.build_tree()
 
     def navigation_type(self):
         return 'Person'
@@ -453,7 +476,7 @@ class RelationshipView(NavigationView):
             person = self.dbstate.db.get_person_from_handle(handle)
             name = name_displayer.display(person)
             if use_gender:
-                gender = _GenderCode[person.gender]
+                gender = self.symbols.get_symbol_for_string(person.gender)
             else:
                 gender = ""
             return (name, gender)
@@ -565,7 +588,8 @@ class RelationshipView(NavigationView):
         name = name_displayer.display(person)
         fmt = '<span size="larger" weight="bold">%s</span>'
         text = fmt % escape(name)
-        label = widgets.DualMarkupLabel(text, _GenderCode[person.gender],
+        gender_code = self.symbols.get_symbol_for_string(person.gender)
+        label = widgets.DualMarkupLabel(text, gender_code,
                                         halign=Gtk.Align.END)
         if self._config.get('preferences.releditbtn'):
             button = widgets.IconButton(self.edit_button_press,
@@ -738,6 +762,26 @@ class RelationshipView(NavigationView):
                           _ADATA_STOP-_ADATA_START, 1)
         self.row += 1
 
+    def marriage_symbol(self, family):
+        if family:
+            if self.uistate and self.uistate.symbols:
+                father = mother = None
+                hdl1 = family.get_father_handle()
+                if hdl1:
+                    father = self.dbstate.db.get_person_from_handle(hdl1).gender
+                hdl2 = family.get_mother_handle()
+                if hdl2:
+                    mother = self.dbstate.db.get_person_from_handle(hdl2).gender
+                if father != mother:
+                    msg = '<span size="24000" >%s</span>' % self.marr
+                elif father == Person.MALE:
+                    msg = '<span size="24000" >%s</span>' % self.homom
+                else:
+                    msg = '<span size="24000" >%s</span>' % self.homof
+        else:
+            msg = ""
+        return msg
+
     def write_label(self, title, family, is_parent, person = None):
         """
         Write a Family header row
@@ -788,6 +832,10 @@ class RelationshipView(NavigationView):
             hbox = Gtk.Box()
             hbox.set_spacing(12)
             hbox.set_hexpand(True)
+            if self.uistate and self.uistate.symbols:
+                msg = self.marriage_symbol(family)
+                marriage = widgets.MarkupLabel(msg)
+                hbox.pack_start(marriage, False, True, 0)
             if is_parent:
                 call_fcn = self.add_parent_family
                 del_fcn = self.delete_parent_family
