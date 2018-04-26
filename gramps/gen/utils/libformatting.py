@@ -62,14 +62,15 @@ class FormattingHelper:
 
     def reload_symbols(self):
         self.clear_cache()
-        death_idx = self.uistate.death_symbol
         if self.uistate and self.uistate.symbols:
+            death_idx = self.uistate.death_symbol
             self.male = self.symbols.get_symbol_for_string(self.symbols.SYMBOL_MALE)
             self.female = self.symbols.get_symbol_for_string(self.symbols.SYMBOL_FEMALE)
             self.bth = self.symbols.get_symbol_for_string(self.symbols.SYMBOL_BIRTH)
             self.marr = self.symbols.get_symbol_for_string(self.symbols.SYMBOL_MARRIAGE)
             self.dth = self.symbols.get_death_symbol_for_char(death_idx)
         else:
+            death_idx = self.symbols.DEATH_SYMBOL_LATIN_CROSS
             self.male = self.symbols.get_symbol_fallback(self.symbols.SYMBOL_MALE)
             self.female = self.symbols.get_symbol_fallback(self.symbols.SYMBOL_FEMALE)
             self.marr = self.symbols.get_symbol_fallback(self.symbols.SYMBOL_MARRIAGE)
