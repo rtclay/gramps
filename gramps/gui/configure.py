@@ -73,6 +73,7 @@ from .spell import HAVE_GTKSPELL
 from gramps.gen.constfunc import win
 _ = glocale.translation.gettext
 from gramps.gen.utils.symbols import Symbols
+from gramps.gen.constfunc import get_env_var
 
 #-------------------------------------------------------------------------
 #
@@ -1833,7 +1834,21 @@ class GrampsPreferences(ConfigureDialog):
             if not self.in_progress:
                 return # We clicked on Cancel
             font = fontconfig.FcFont(path)
-            fontname = font.family[0][1]
+            local = get_env_var('LANGUAGE', 'en')
+            if isinstance(font.family, list):
+                fontname = None
+                for lang,fam in font.family:
+                    if lang == local:
+                        fontname = fam
+                if not fontname:
+                    fontname = font.family[0][1]
+            else:
+                if local in font.family:
+                    fontname = font.family[local]
+                else:
+                    for lang, name in font.family:     # version 0.6.0 use dict
+                        fontname = name
+                        break
             for rand in range(symbols.SYMBOL_MALE, symbols.SYMBOL_EXTINCT+1):
                 string = symbols.get_symbol_for_html(rand)
                 value = symbols.get_symbol_for_string(rand)
