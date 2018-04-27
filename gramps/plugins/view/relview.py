@@ -192,10 +192,11 @@ class RelationshipView(NavigationView):
             self.male = gsfs(self.symbols.SYMBOL_MALE)
             self.female = gsfs(self.symbols.SYMBOL_FEMALE)
             self.bth = gsfs(self.symbols.SYMBOL_BIRTH)
-            self.marr = gsfs(self.symbols.SYMBOL_MARRIAGE)
+            self.marr = gsfs(self.symbols.SYMBOL_HETEROSEXUAL)
             self.homom = gsfs(self.symbols.SYMBOL_MALE_HOMOSEXUAL)
             self.homof = gsfs(self.symbols.SYMBOL_LESBIAN)
-            self.marr = gsfs(self.symbols.SYMBOL_MARRIAGE)
+            self.divorce = gsfs(self.symbols.SYMBOL_DIVORCE)
+            self.unmarr = gsfs(self.symbols.SYMBOL_UNMARRIED_PARTNERSHIP)
             death_idx = self.uistate.death_symbol
             self.dth = self.symbols.get_death_symbol_for_char(death_idx)
         else:
@@ -203,7 +204,11 @@ class RelationshipView(NavigationView):
             self.male = gsf(self.symbols.SYMBOL_MALE)
             self.female = gsf(self.symbols.SYMBOL_FEMALE)
             self.bth = gsf(self.symbols.SYMBOL_BIRTH)
-            self.marr = gsf(self.symbols.SYMBOL_MARRIAGE)
+            self.marr = gsf(self.symbols.SYMBOL_HETEROSEXUAL)
+            self.homom = gsf(self.symbols.SYMBOL_MALE_HOMOSEXUAL)
+            self.homof = gsf(self.symbols.SYMBOL_LESBIAN)
+            self.divorce = gsf(self.symbols.SYMBOL_DIVORCE)
+            self.unmarr = gsf(self.symbols.SYMBOL_UNMARRIED_PARTNERSHIP)
             death_idx = self.symbols.DEATH_SYMBOL_LATIN_CROSS
             self.dth = self.symbols.get_death_symbol_fallback(death_idx)
 
@@ -762,22 +767,25 @@ class RelationshipView(NavigationView):
                           _ADATA_STOP-_ADATA_START, 1)
         self.row += 1
 
-    def marriage_symbol(self, family):
+    def marriage_symbol(self, family, markup=True):
         if family:
-            if self.uistate and self.uistate.symbols:
-                father = mother = None
-                hdl1 = family.get_father_handle()
-                if hdl1:
-                    father = self.dbstate.db.get_person_from_handle(hdl1).gender
-                hdl2 = family.get_mother_handle()
-                if hdl2:
-                    mother = self.dbstate.db.get_person_from_handle(hdl2).gender
-                if father != mother:
-                    msg = '<span size="24000" >%s</span>' % self.marr
-                elif father == Person.MALE:
-                    msg = '<span size="24000" >%s</span>' % self.homom
-                else:
-                    msg = '<span size="24000" >%s</span>' % self.homof
+            father = mother = None
+            hdl1 = family.get_father_handle()
+            if hdl1:
+                father = self.dbstate.db.get_person_from_handle(hdl1).gender
+            hdl2 = family.get_mother_handle()
+            if hdl2:
+                mother = self.dbstate.db.get_person_from_handle(hdl2).gender
+            if father != mother:
+                symbol = self.marr
+            elif father == Person.MALE:
+                symbol = self.homom
+            else:
+                symbol = self.homof
+            if markup:
+                msg = '<span size="24000" >%s</span>' % symbol
+            else:
+                msg = symbol
         else:
             msg = ""
         return msg
@@ -923,6 +931,7 @@ class RelationshipView(NavigationView):
                     childmsg = _(" (1 sibling)")
             else :
                 childmsg = _(" (only child)")
+            self.family = family
             box = self.get_people_box(family.get_father_handle(),
                                       family.get_mother_handle(),
                                       post_msg=childmsg)
@@ -977,6 +986,7 @@ class RelationshipView(NavigationView):
                             childmsg = _(" (1 sibling)")
                     else :
                         childmsg = _(" (only child)")
+                    self.family = None
                     box = self.get_people_box(post_msg=childmsg)
                     eventbox = widgets.ShadeBox(self.use_shade)
                     eventbox.add(box)
@@ -1016,6 +1026,10 @@ class RelationshipView(NavigationView):
     def get_people_box(self, *handles, **kwargs):
         hbox = Gtk.Box()
         initial_name = True
+        if self.uistate and self.uistate.symbols:
+            msg = self.marriage_symbol(self.family) + " "
+            marriage = widgets.MarkupLabel(msg)
+            hbox.pack_start(marriage, False, True, 0)
         for handle in handles:
             if not initial_name:
                 link_label = Gtk.Label(label=" %s " % _('and'))
@@ -1259,15 +1273,15 @@ class RelationshipView(NavigationView):
 
         if bdate and ddate:
             value = _("%(birthabbrev)s %(birthdate)s, %(deathabbrev)s %(deathdate)s") % {
-                'birthabbrev': birth.type.get_abbreviation(),
-                'deathabbrev': death.type.get_abbreviation(),
+                'birthabbrev': self.bth,
+                'deathabbrev': self.dth,
                 'birthdate' : bdate,
                 'deathdate' : ddate
                 }
         elif bdate:
-            value = _("%(event)s %(date)s") % {'event': birth.type.get_abbreviation(), 'date': bdate}
+            value = _("%(event)s %(date)s") % {'event': self.bth, 'date': bdate}
         elif ddate:
-            value = _("%(event)s %(date)s") % {'event': death.type.get_abbreviation(), 'date': ddate}
+            value = _("%(event)s %(date)s") % {'event': self.dth, 'date': ddate}
         else:
             value = ""
         return value
@@ -1337,7 +1351,16 @@ class RelationshipView(NavigationView):
             if (event and event.get_type().is_relationship_event() and
                 (event_ref.get_role() == EventRoleType.FAMILY or
                  event_ref.get_role() == EventRoleType.PRIMARY)):
-                self.write_event_ref(vbox, event.get_type().string, event)
+                if event.get_type() ==  EventType.MARRIAGE:
+                    msg = self.marriage_symbol(family, markup=False)
+                    etype = msg
+                elif event.get_type() ==  EventType.DIVORCE:
+                    etype = self.divorce
+                elif event.get_type() ==  EventType.DIVORCE:
+                    etype = self.divorce
+                else:
+                    etype = event.get_type().string
+                self.write_event_ref(vbox, etype, event)
                 value = True
         return value
 
@@ -1412,6 +1435,7 @@ class RelationshipView(NavigationView):
                                    ).format(number_of=count)
             else :
                 childmsg = _(" (no children)")
+            self.family = family
             box = self.get_people_box(handle, post_msg=childmsg)
             eventbox = widgets.ShadeBox(self.use_shade)
             eventbox.add(box)
@@ -1457,6 +1481,7 @@ class RelationshipView(NavigationView):
                                        ).format(number_of=count)
                 else :
                     childmsg = _(" (no children)")
+                self.family = None
                 box = self.get_people_box(post_msg=childmsg)
                 eventbox = widgets.ShadeBox(self.use_shade)
                 eventbox.add(box)
